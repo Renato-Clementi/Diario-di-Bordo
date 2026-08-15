@@ -253,6 +253,57 @@ const S = {
 
 const $ = id => document.getElementById(id);
 
+/* ---------- persistenza (IndexedDB) ---------- */
+const DB_NAME='diarioRotta', DB_STORE='stato';
+function apriDB(){
+  return new Promise((res,rej)=>{
+    const rq=indexedDB.open(DB_NAME,1);
+    rq.onupgradeneeded=()=>rq.result.createObjectStore(DB_STORE);
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error);
+  });
+}
+let _salvaT=null;
+function salva(){ // debounce 800ms: evita scritture a raffica durante il tracking
+  clearTimeout(_salvaT);
+  _salvaT=setTimeout(async()=>{
+    try{
+      const db=await apriDB();
+      const dati={
+        entries:S.entries.map(e=>({...e, t:e.t.toISOString()})),
+        path:S.path, distanza:S.distanza, contatore:S.contatore,
+        ultimaTappaPos:S.ultimaTappaPos
+      };
+      db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).put(dati,'v1');
+    }catch(err){ console.warn('Salvataggio non riuscito:',err); }
+  },800);
+}
+async function ripristina(){
+  try{
+    const db=await apriDB();
+    const dati=await new Promise((res,rej)=>{
+      const rq=db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).get('v1');
+      rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);
+    });
+    if(!dati) return;
+    S.entries=(dati.entries||[]).map(e=>({...e, t:new Date(e.t),
+      stato: e.stato==='caricamento' ? 'errore' : e.stato})); // richieste interrotte -> riprovabili
+    S.path=dati.path||[];
+    S.distanza=dati.distanza||0;
+    S.contatore=dati.contatore||0;
+    S.ultimaTappaPos=dati.ultimaTappaPos||null;
+    renderTimeline(); aggiornaStat();
+    if(S.entries.length) avviso("Diario ripristinato: "+S.entries.length+" tappe recuperate.",4000);
+  }catch(err){ console.warn('Ripristino non riuscito:',err); }
+}
+async function cancellaDB(){
+  try{
+    const db=await apriDB();
+    db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).delete('v1');
+  }catch(_){}
+}
+document.addEventListener('DOMContentLoaded',ripristina);
+
 /* ---------- utilità ---------- */
 function haversine(a,b){
   const R=6371000, r=x=>x*Math.PI/180;
@@ -317,6 +368,7 @@ function onPos(pos){
   }
   S.path.push(p);
   aggiornaStat();
+  salva();
   checkSosta(p);
 }
 
@@ -390,6 +442,7 @@ function creaTappa(lat,lon,quando,tipo){
   S.entries.sort((a,b)=>a.t-b.t);
   renderTimeline();
   aggiornaStat();
+  salva();
   generaRacconto(e);
 }
 
@@ -462,6 +515,7 @@ STORIA: [4-6 frasi sulla storia del luogo o della zona, con fatti e date verific
     e.nome="Tappa "+e.lat.toFixed(4)+", "+e.lon.toFixed(4);
   }
   renderTimeline();
+  salva();
 }
 
 /* ---------- rendering ---------- */
@@ -472,7 +526,16 @@ function renderTimeline(){
     tl.innerHTML='<div class="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento, segna un posto o prova il percorso demo.</div>';
     return;
   }
+  let giornoCorrente='';
   for(const e of S.entries){
+    const g=e.t.toDateString();
+    if(g!==giornoCorrente){
+      giornoCorrente=g;
+      const sep=document.createElement('div');
+      sep.style.cssText='font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--inchiostro-tenue);font-weight:700;margin:4px 0 12px';
+      sep.textContent=dataIT(e.t);
+      tl.appendChild(sep);
+    }
     const div=document.createElement('div');
     div.className='tappa';
     const maps='https://maps.google.com/?q='+e.lat+','+e.lon;
@@ -544,7 +607,7 @@ function renderTimeline(){
   tl.querySelectorAll('.fotoelimina').forEach(b=>{
     b.addEventListener('click',()=>{
       const e=S.entries.find(x=>x.id===b.dataset.id);
-      if(e){ e.foto.splice(parseInt(b.dataset.i,10),1); renderTimeline(); }
+      if(e){ e.foto.splice(parseInt(b.dataset.i,10),1); renderTimeline(); salva(); }
     });
   });
 }
@@ -580,6 +643,7 @@ $('inpFoto').addEventListener('change', async ev=>{
   }
   ev.target.value='';
   renderTimeline();
+  salva();
 });
 
 /* ridimensiona a max 1280px lato lungo, JPEG q0.8 (memoria + payload API contenuti) */
@@ -635,8 +699,9 @@ $('btnExportHtml').addEventListener('click',()=>{
 });
 
 $('btnReset').addEventListener('click',()=>{
-  if(!confirm("Svuotare il diario e il percorso?")) return;
+  if(!confirm("Svuotare il diario e il percorso? I dati salvati verranno eliminati definitivamente.")) return;
   S.path=[];S.distanza=0;S.entries=[];S.anchor=null;S.ultimaTappaPos=null;
+  cancellaDB();
   renderTimeline();aggiornaStat();
 });
 </script>
