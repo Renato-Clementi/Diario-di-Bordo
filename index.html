@@ -165,6 +165,33 @@
   .lightbox.show{display:flex}
   .lightbox img{max-width:100%;max-height:90vh;border-radius:4px}
   .btn-foto{padding:6px 10px;font-size:12.5px;font-weight:600;border-color:var(--linea)}
+
+  /* note personali */
+  .sezione-nota{
+    margin:10px 16px 0;padding:8px 12px;
+    border-left:3px solid #8A6F3F;background:#FBF8EE;border-radius:0 4px 4px 0;
+  }
+  .sezione-nota h4{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8A6F3F;margin-bottom:2px;font-weight:700}
+  .sezione-nota p{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-style:italic;font-size:15px;white-space:pre-wrap}
+  .notabox{margin:10px 16px 0}
+  .notabox textarea{
+    width:100%;min-height:84px;font:inherit;font-size:15px;padding:9px 11px;
+    border:1.5px solid var(--linea);border-radius:4px;background:#FBF8EE;resize:vertical;
+  }
+  .notabox textarea:focus-visible{outline:2px solid #8A6F3F}
+  .notabox .azioni{display:flex;gap:8px;margin-top:6px}
+
+  /* memo vocali */
+  .audiolista{margin:10px 16px 0;display:flex;flex-direction:column;gap:6px}
+  .audioriga{display:flex;align-items:center;gap:8px}
+  .audioriga audio{flex:1;height:36px;min-width:0}
+  .audioriga button{padding:4px 9px;font-size:12px;border-color:var(--linea);color:var(--inchiostro-tenue)}
+  .btn-foto.registrando{
+    background:var(--segnavia);border-color:var(--segnavia);color:var(--bianco-segnavia);
+    animation:lampeggia 1s ease-in-out infinite;
+  }
+  @keyframes lampeggia{50%{opacity:.65}}
+  @media (prefers-reduced-motion: reduce){.btn-foto.registrando{animation:none}}
 </style>
 </head>
 <body>
@@ -287,6 +314,7 @@ async function ripristina(){
     });
     if(!dati) return;
     S.entries=(dati.entries||[]).map(e=>({...e, t:new Date(e.t),
+      nota:e.nota||'', audio:e.audio||[], foto:e.foto||[],
       stato: e.stato==='caricamento' ? 'errore' : e.stato})); // richieste interrotte -> riprovabili
     S.path=dati.path||[];
     S.distanza=dati.distanza||0;
@@ -436,7 +464,9 @@ function creaTappa(lat,lon,quando,tipo){
   const e={
     id:'t'+(++S.contatore), t:quando, lat, lon,
     nome:null, ambiente:null, storia:null, stato:'caricamento', tipo,
-    foto:[]   // dataURL JPEG ridimensionate
+    foto:[],   // dataURL JPEG ridimensionate
+    nota:'',   // appunti personali
+    audio:[]   // memo vocali {data(dataURL), mime}
   };
   S.entries.push(e);
   S.entries.sort((a,b)=>a.t-b.t);
@@ -454,7 +484,9 @@ async function generaRacconto(e, usaFoto=false){
 `Coordinate GPS: latitudine ${e.lat.toFixed(5)}, longitudine ${e.lon.toFixed(5)}.
 Usa la ricerca web per identificare con precisione questo luogo (località, punto di interesse o zona).`+
 (conFoto?`
-Ho allegato ${e.foto.length} foto scattate sul posto: usale per rendere la descrizione dell'ambiente concreta e fedele a ciò che si vede (luce, colori, dettagli, atmosfera).`:``)+`
+Ho allegato ${e.foto.length} foto scattate sul posto: usale per rendere la descrizione dell'ambiente concreta e fedele a ciò che si vede (luce, colori, dettagli, atmosfera).`:``)+
+(e.nota?`
+Appunti personali dell'autore su questa tappa (tienine conto nella descrizione dell'ambiente, senza contraddirli): «${e.nota}»`:``)+`
 Poi rispondi in italiano, SOLO con questo formato esatto, senza altro testo:
 
 NOME: [nome del luogo, breve, es. "Lungolago di Omegna (VB)"]
@@ -558,6 +590,26 @@ function renderTimeline(){
           '<button class="fotoelimina" data-id="'+e.id+'" data-i="'+i+'" aria-label="Elimina foto">×</button>'+
         '</div>').join('')+'</div>';
     }
+    let notaHtml='';
+    if(S.notaAperta===e.id){
+      notaHtml='<div class="notabox">'+
+        '<textarea id="txtNota" placeholder="I tuoi appunti su questa tappa…">'+esc(e.nota)+'</textarea>'+
+        '<div class="azioni">'+
+          '<button class="btn-foto salvanota" data-id="'+e.id+'">Salva nota</button>'+
+          '<button class="btn-foto annullanota">Annulla</button>'+
+        '</div></div>';
+    } else if(e.nota){
+      notaHtml='<div class="sezione-nota"><h4>Appunti</h4><p>'+esc(e.nota)+'</p></div>';
+    }
+    let audioHtml='';
+    if(e.audio.length){
+      audioHtml='<div class="audiolista">'+e.audio.map((a,i)=>
+        '<div class="audioriga">'+
+          '<audio controls preload="metadata" src="'+a.data+'"></audio>'+
+          '<button class="audioelimina" data-id="'+e.id+'" data-i="'+i+'" aria-label="Elimina memo">×</button>'+
+        '</div>').join('')+'</div>';
+    }
+    const staRegistrando = S.registrando===e.id;
     div.innerHTML=
       '<div class="scheda">'+
         '<div class="scheda-testata">'+
@@ -566,9 +618,14 @@ function renderTimeline(){
           '<span class="badge">'+esc(e.tipo)+'</span>'+
         '</div>'+
         '<div class="scheda-corpo">'+corpo+'</div>'+
+        notaHtml+
+        audioHtml+
         fotoHtml+
         '<div class="scheda-piede">'+
           '<button class="btn-foto aggfoto" data-id="'+e.id+'">📷 Aggiungi foto</button>'+
+          '<button class="btn-foto aggaudio'+(staRegistrando?' registrando':'')+'" data-id="'+e.id+'">'+
+            (staRegistrando?'■ Ferma':'🎙️ Memo')+'</button>'+
+          '<button class="btn-foto aggnota" data-id="'+e.id+'">✏️ '+(e.nota?'Modifica nota':'Nota')+'</button>'+
           (e.stato!=='caricamento'
             ? '<button class="btn-foto rigen" data-id="'+e.id+'">↻ Rigenera</button>':'')+
           (e.foto.length && e.stato!=='caricamento'
@@ -586,6 +643,32 @@ function renderTimeline(){
   });
   tl.querySelectorAll('.aggfoto').forEach(b=>{
     b.addEventListener('click',()=>{ S.fotoTarget=b.dataset.id; $('inpFoto').click(); });
+  });
+  tl.querySelectorAll('.aggaudio').forEach(b=>{
+    b.addEventListener('click',()=>toggleRegistrazione(b.dataset.id));
+  });
+  tl.querySelectorAll('.audioelimina').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const e=S.entries.find(x=>x.id===b.dataset.id);
+      if(e && confirm("Eliminare questo memo vocale?")){
+        e.audio.splice(parseInt(b.dataset.i,10),1); renderTimeline(); salva();
+      }
+    });
+  });
+  tl.querySelectorAll('.aggnota').forEach(b=>{
+    b.addEventListener('click',()=>{ S.notaAperta=b.dataset.id; renderTimeline();
+      const t=$('txtNota'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); }
+    });
+  });
+  tl.querySelectorAll('.salvanota').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const e=S.entries.find(x=>x.id===b.dataset.id);
+      if(e){ e.nota=$('txtNota').value.trim(); }
+      S.notaAperta=null; renderTimeline(); salva();
+    });
+  });
+  tl.querySelectorAll('.annullanota').forEach(b=>{
+    b.addEventListener('click',()=>{ S.notaAperta=null; renderTimeline(); });
   });
   tl.querySelectorAll('.rigen').forEach(b=>{
     b.addEventListener('click',()=>{
@@ -613,6 +696,53 @@ function renderTimeline(){
 }
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 
+/* ---------- memo vocali ---------- */
+let _rec=null, _recTimer=null;
+async function toggleRegistrazione(id){
+  // se sto già registrando: fermo (su qualsiasi tappa)
+  if(_rec && _rec.state==='recording'){ _rec.stop(); return; }
+
+  if(!navigator.mediaDevices || !window.MediaRecorder){
+    avviso("Questo browser non supporta la registrazione audio."); return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    // Safari iOS registra in mp4/aac, Chrome/Android in webm/opus
+    const mime=MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+             : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    _rec=new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
+    const pezzi=[];
+    _rec.ondataavailable=ev=>{ if(ev.data.size) pezzi.push(ev.data); };
+    _rec.onstop=async()=>{
+      clearTimeout(_recTimer);
+      stream.getTracks().forEach(t=>t.stop());
+      S.registrando=null;
+      const blob=new Blob(pezzi,{type:_rec.mimeType||'audio/webm'});
+      _rec=null;
+      if(blob.size<200){ renderTimeline(); return; } // registrazione vuota
+      const dataUrl=await new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res(r.result); r.onerror=()=>rej(r.error);
+        r.readAsDataURL(blob);
+      });
+      const e=S.entries.find(x=>x.id===id);
+      if(e){ e.audio.push({data:dataUrl, mime:blob.type}); salva(); }
+      renderTimeline();
+    };
+    _rec.start();
+    S.registrando=id;
+    renderTimeline();
+    // limite di sicurezza: 3 minuti (protegge memoria e IndexedDB)
+    _recTimer=setTimeout(()=>{ if(_rec&&_rec.state==='recording'){ _rec.stop(); avviso("Memo fermato al limite di 3 minuti."); } },180000);
+  }catch(err){
+    S.registrando=null;
+    avviso(err.name==='NotAllowedError'
+      ? "Permesso microfono negato. Controlla le impostazioni del browser per questo sito."
+      : "Microfono non disponibile: "+err.message, 8000);
+    renderTimeline();
+  }
+}
+
 /* ---------- export ---------- */
 $('btnExport').addEventListener('click',()=>{
   if(!S.entries.length){ avviso("Nessuna tappa da esportare."); return; }
@@ -621,6 +751,8 @@ $('btnExport').addEventListener('click',()=>{
   for(const e of S.entries){
     md+="## "+oraIT(e.t)+" — "+(e.nome||"Tappa")+"\n";
     md+="*Coordinate: "+e.lat.toFixed(5)+", "+e.lon.toFixed(5)+" ("+e.tipo+")*\n\n";
+    if(e.nota)     md+="**Appunti.** "+e.nota+"\n\n";
+    if(e.audio.length) md+="*("+e.audio.length+" memo vocali — inclusi nell'export .html)*\n\n";
     if(e.ambiente) md+="**Ambiente.** "+e.ambiente+"\n\n";
     if(e.storia)   md+="**Storia.** "+e.storia+"\n\n";
     md+="---\n\n";
@@ -685,6 +817,8 @@ $('btnExportHtml').addEventListener('click',()=>{
   for(const e of S.entries){
     h+='<h2>'+oraIT(e.t)+' — '+esc(e.nome||'Tappa')+'</h2>'+
        '<p class="meta">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+' ('+esc(e.tipo)+')</p>';
+    if(e.nota)     h+='<h4>Appunti</h4><p style="font-style:italic;border-left:3px solid #8A6F3F;padding-left:10px;white-space:pre-wrap">'+esc(e.nota)+'</p>';
+    if(e.audio.length) h+='<h4>Memo vocali</h4>'+e.audio.map(a=>'<audio controls preload="metadata" src="'+a.data+'" style="display:block;width:100%;margin:4px 0"></audio>').join('');
     if(e.foto.length) h+='<div class="foto">'+e.foto.map(f=>'<img src="'+f+'" alt="Foto">').join('')+'</div>';
     if(e.ambiente) h+='<h4>Ambiente</h4><p>'+esc(e.ambiente)+'</p>';
     if(e.storia)   h+='<h4>Storia</h4><p>'+esc(e.storia)+'</p>';
