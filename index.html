@@ -6,14 +6,18 @@
 <title>Diario di Rotta — Taccuino GPS</title>
 <style>
   :root{
-    --carta:#F4F2E9;
-    --carta-scura:#EAE6D8;
-    --inchiostro:#22303F;      /* blu carta nautica */
-    --inchiostro-tenue:#5A6675;
-    --segnavia:#B5432A;        /* rosso segnavia CAI */
-    --bianco-segnavia:#FCFBF5;
-    --linea:#C9C3B2;
-    --ok:#3E6B4F;
+    --carta:#F3E7CF;           /* sabbia calda */
+    --carta-scura:#E9D8B4;     /* sabbia in ombra */
+    --inchiostro:#4A2E1C;      /* legno di mesquite */
+    --inchiostro-tenue:#8A6B52;
+    --segnavia:#C05A21;        /* arancio tramonto */
+    --bianco-segnavia:#FBF3E0;
+    --linea:#D8C39A;
+    --ok:#6E7F5C;              /* verde salvia / saguaro */
+    --canyon-1:#8C3B24;        /* strati di roccia */
+    --canyon-2:#B4552D;
+    --canyon-3:#D3894C;
+    --sole:#E8A13C;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
@@ -28,12 +32,11 @@
   .mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
 
   header{
-    padding:26px 20px 18px;
-    border-bottom:3px double var(--inchiostro);
-    background:
-      repeating-linear-gradient(90deg,transparent 0 118px, rgba(34,48,63,.05) 118px 120px),
-      var(--carta);
+    padding:26px 20px 0;
+    background:var(--carta);
   }
+  .scena{display:block;width:100%;height:110px;margin-top:14px}
+  @media (min-width:600px){.scena{height:140px}}
   .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--segnavia);font-weight:600}
   h1{font-size:30px;line-height:1.1;font-weight:600;margin-top:4px}
   h1 .display{font-style:italic}
@@ -90,14 +93,12 @@
   .avviso.show{display:block}
 
   /* timeline = sentiero con segnavia */
-  .timeline{position:relative;margin:26px 0 10px;padding-left:34px}
-  .timeline::before{
-    content:"";position:absolute;left:11px;top:6px;bottom:6px;width:6px;
-    background:var(--segnavia);border-radius:3px;
-  }
-  .timeline::after{ /* tratteggio bianco = segnavia CAI */
-    content:"";position:absolute;left:13px;top:6px;bottom:6px;width:2px;
-    background:repeating-linear-gradient(180deg,var(--bianco-segnavia) 0 10px,transparent 10px 22px);
+  .timeline{position:relative;margin:26px 0 10px;padding-left:36px}
+  .timeline::before{ /* strati di roccia del canyon */
+    content:"";position:absolute;left:10px;top:6px;bottom:6px;width:8px;border-radius:4px;
+    background:repeating-linear-gradient(180deg,
+      var(--canyon-1) 0 26px, var(--canyon-2) 26px 44px,
+      var(--canyon-3) 44px 56px, var(--canyon-2) 56px 74px);
   }
   .vuoto{color:var(--inchiostro-tenue);font-size:14px;padding:8px 0 8px 2px;font-style:italic}
 
@@ -106,14 +107,14 @@
   @media (prefers-reduced-motion: reduce){
     .tappa{animation:none}.dot.on{animation:none}
   }
-  .tappa::before{ /* pin waypoint */
-    content:"";position:absolute;left:-31px;top:14px;width:16px;height:16px;
-    background:var(--bianco-segnavia);border:4px solid var(--inchiostro);border-radius:50%;
-    z-index:1;
+  .tappa::before{ /* waypoint: saguaro */
+    content:"";position:absolute;left:-34px;top:8px;width:26px;height:26px;z-index:1;
+    background:var(--bianco-segnavia) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%236E7F5C'%3E%3Cpath d='M10.6 21v-12a1.6 1.6 0 0 1 3.2 0v12z'/%3E%3Cpath d='M7 11a1.4 1.4 0 0 1 2.8 0v3h1v2.2H8.4A1.4 1.4 0 0 1 7 14.8z'/%3E%3Cpath d='M17 9.5a1.4 1.4 0 0 0-2.8 0v4h-1v2.2h2.4a1.4 1.4 0 0 0 1.4-1.4z'/%3E%3C/g%3E%3C/svg%3E") center/18px no-repeat;
+    border:2.5px solid var(--canyon-2);border-radius:50%;
   }
   .scheda{
-    background:#FFFEF9;border:1px solid var(--linea);border-radius:5px;
-    box-shadow:2px 3px 0 rgba(34,48,63,.10);
+    background:#FCF5E4;border:1px solid var(--linea);border-radius:5px;
+    box-shadow:2px 3px 0 rgba(74,46,28,.14);
     overflow:hidden;
   }
   .scheda-testata{
@@ -169,16 +170,16 @@
   /* note personali */
   .sezione-nota{
     margin:10px 16px 0;padding:8px 12px;
-    border-left:3px solid #8A6F3F;background:#FBF8EE;border-radius:0 4px 4px 0;
+    border-left:3px solid var(--ok);background:#F5EEDA;border-radius:0 4px 4px 0;
   }
-  .sezione-nota h4{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8A6F3F;margin-bottom:2px;font-weight:700}
+  .sezione-nota h4{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ok);margin-bottom:2px;font-weight:700}
   .sezione-nota p{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-style:italic;font-size:15px;white-space:pre-wrap}
   .notabox{margin:10px 16px 0}
   .notabox textarea{
     width:100%;min-height:84px;font:inherit;font-size:15px;padding:9px 11px;
-    border:1.5px solid var(--linea);border-radius:4px;background:#FBF8EE;resize:vertical;
+    border:1.5px solid var(--linea);border-radius:4px;background:#F5EEDA;resize:vertical;
   }
-  .notabox textarea:focus-visible{outline:2px solid #8A6F3F}
+  .notabox textarea:focus-visible{outline:2px solid var(--ok)}
   .notabox .azioni{display:flex;gap:8px;margin-top:6px}
 
   /* memo vocali */
@@ -202,6 +203,31 @@
     <h1 class="display">Diario di <span class="display">Rotta</span></h1>
     <div class="sub">Traccia il percorso, riconosce le soste e racconta ambiente e storia di ogni luogo.</div>
   </div>
+  <svg class="scena" viewBox="0 0 800 140" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <!-- cielo al tramonto -->
+    <defs>
+      <linearGradient id="cielo" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#F3E7CF"/><stop offset="1" stop-color="#EFC98F"/>
+      </linearGradient>
+    </defs>
+    <rect width="800" height="140" fill="url(#cielo)"/>
+    <!-- sole -->
+    <circle cx="618" cy="52" r="34" fill="#E8A13C"/>
+    <circle cx="618" cy="52" r="42" fill="#E8A13C" opacity=".25"/>
+    <!-- mesa lontana -->
+    <path d="M0 96 L70 96 82 74 190 74 202 96 320 96 320 140 0 140 Z" fill="#D3894C" opacity=".7"/>
+    <path d="M430 100 L470 100 480 80 585 80 596 100 800 100 800 140 430 140 Z" fill="#D3894C" opacity=".55"/>
+    <!-- mesa media -->
+    <path d="M120 112 L210 112 224 86 388 86 402 112 560 112 574 92 688 92 700 112 800 112 800 140 120 140 Z" fill="#B4552D"/>
+    <!-- terreno in primo piano -->
+    <path d="M0 124 Q 200 116 420 124 T 800 122 L800 140 0 140 Z" fill="#8C3B24"/>
+    <!-- saguari in silhouette -->
+    <g fill="#54301C">
+      <path d="M96 128 v-38 a6 6 0 0 1 12 0 v38 z M88 106 a5 5 0 0 1 10 0 v10 h-4 v6 h-6 a0 0 0 0 1 0 0 z M116 96 a5 5 0 0 1 10 0 v14 a5 5 0 0 1 -10 0 z M116 112 h-8 v-6 h8 z"/>
+      <path d="M700 130 v-30 a5 5 0 0 1 10 0 v30 z M694 114 a4 4 0 0 1 8 0 v8 h-3 v5 h-5 z"/>
+      <path d="M330 132 v-22 a4 4 0 0 1 8 0 v22 z"/>
+    </g>
+  </svg>
 </header>
 
 <div class="wrap">
@@ -564,8 +590,8 @@ function renderTimeline(){
     if(g!==giornoCorrente){
       giornoCorrente=g;
       const sep=document.createElement('div');
-      sep.style.cssText='font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--inchiostro-tenue);font-weight:700;margin:4px 0 12px';
-      sep.textContent=dataIT(e.t);
+      sep.style.cssText='font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--canyon-2);font-weight:700;margin:4px 0 12px';
+      sep.textContent='☀ '+dataIT(e.t);
       tl.appendChild(sep);
     }
     const div=document.createElement('div');
@@ -807,17 +833,17 @@ $('btnExportHtml').addEventListener('click',()=>{
   let h='<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width, initial-scale=1">'+
     '<title>Diario di Rotta — '+dataIT(S.entries[0].t)+'</title>'+
-    '<style>body{font-family:Palatino,Georgia,serif;background:#F4F2E9;color:#22303F;max-width:680px;margin:0 auto;padding:24px 18px;line-height:1.6}'+
-    'h1{border-bottom:3px double #22303F;padding-bottom:8px}h2{color:#B5432A;margin-top:34px}'+
-    '.meta{color:#5A6675;font-size:14px}.foto{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}'+
-    '.foto img{width:200px;max-width:45%;border-radius:4px;border:1px solid #C9C3B2}'+
-    'h4{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#5A6675;margin:14px 0 2px}</style></head><body>'+
+    '<style>body{font-family:Palatino,Georgia,serif;background:#F3E7CF;color:#4A2E1C;max-width:680px;margin:0 auto;padding:24px 18px;line-height:1.6}'+
+    'h1{border-bottom:3px double #4A2E1C;padding-bottom:8px}h2{color:#C05A21;margin-top:34px}'+
+    '.meta{color:#8A6B52;font-size:14px}.foto{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}'+
+    '.foto img{width:200px;max-width:45%;border-radius:4px;border:1px solid #D8C39A}'+
+    'h4{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#8A6B52;margin:14px 0 2px}</style></head><body>'+
     '<h1>Diario di Rotta</h1><p class="meta">'+esc(dataIT(S.entries[0].t))+
     ' · Percorso: '+(S.distanza/1000).toFixed(1).replace('.',',')+' km · Tappe: '+S.entries.length+'</p>';
   for(const e of S.entries){
     h+='<h2>'+oraIT(e.t)+' — '+esc(e.nome||'Tappa')+'</h2>'+
        '<p class="meta">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+' ('+esc(e.tipo)+')</p>';
-    if(e.nota)     h+='<h4>Appunti</h4><p style="font-style:italic;border-left:3px solid #8A6F3F;padding-left:10px;white-space:pre-wrap">'+esc(e.nota)+'</p>';
+    if(e.nota)     h+='<h4>Appunti</h4><p style="font-style:italic;border-left:3px solid #6E7F5C;padding-left:10px;white-space:pre-wrap">'+esc(e.nota)+'</p>';
     if(e.audio.length) h+='<h4>Memo vocali</h4>'+e.audio.map(a=>'<audio controls preload="metadata" src="'+a.data+'" style="display:block;width:100%;margin:4px 0"></audio>').join('');
     if(e.foto.length) h+='<div class="foto">'+e.foto.map(f=>'<img src="'+f+'" alt="Foto">').join('')+'</div>';
     if(e.ambiente) h+='<h4>Ambiente</h4><p>'+esc(e.ambiente)+'</p>';
