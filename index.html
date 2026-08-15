@@ -34,9 +34,49 @@
   header{
     padding:26px 20px 0;
     background:var(--carta);
+    position:relative;
   }
   .scena{display:block;width:100%;height:110px;margin-top:14px}
   @media (min-width:600px){.scena{height:140px}}
+
+  /* pulsante help + guida */
+  .btn-help{
+    position:absolute;top:14px;right:14px;z-index:20;
+    width:42px;height:42px;border-radius:50%;padding:0;
+    background:var(--segnavia);border-color:var(--segnavia);color:var(--bianco-segnavia);
+    font-size:20px;font-weight:700;line-height:1;
+    box-shadow:2px 3px 0 rgba(74,46,28,.2);
+  }
+  .guida{
+    position:fixed;inset:0;background:rgba(74,46,28,.45);z-index:60;
+    display:none;align-items:flex-start;justify-content:center;
+    padding:18px 12px;overflow-y:auto;
+  }
+  .guida.show{display:flex}
+  .guida-pannello{
+    background:var(--carta);max-width:560px;width:100%;
+    border:1px solid var(--linea);border-radius:8px;
+    box-shadow:4px 6px 0 rgba(74,46,28,.25);
+    padding:20px 20px 26px;position:relative;margin:auto 0;
+  }
+  .guida-chiudi{
+    position:absolute;top:12px;right:12px;width:36px;height:36px;padding:0;
+    border-radius:50%;font-size:17px;line-height:1;
+    background:var(--carta-scura);border-color:var(--linea);
+  }
+  .guida-pannello h2{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:24px;margin-bottom:2px}
+  .guida-pannello .guida-sotto{color:var(--inchiostro-tenue);font-size:13px;margin-bottom:14px}
+  .guida-pannello h3{
+    font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--segnavia);font-weight:700;margin:18px 0 4px;
+    padding-top:12px;border-top:1px solid var(--linea);
+  }
+  .guida-pannello h3:first-of-type{border-top:none;padding-top:0}
+  .guida-pannello p{font-size:14.5px;margin-bottom:6px}
+  .guida-pannello .tasto{
+    display:inline-block;background:var(--carta-scura);border:1px solid var(--linea);
+    border-radius:3px;padding:0 6px;font-size:13px;font-weight:600;white-space:nowrap;
+  }
   .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--segnavia);font-weight:600}
   h1{font-size:30px;line-height:1.1;font-weight:600;margin-top:4px}
   h1 .display{font-style:italic}
@@ -69,8 +109,13 @@
   button.rosso{background:var(--segnavia);border-color:var(--segnavia);color:var(--bianco-segnavia)}
   button:disabled{opacity:.45;cursor:not-allowed}
   button:focus-visible{outline:3px solid var(--segnavia);outline-offset:2px}
-  .secondary-row{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
-  .secondary-row button{padding:8px 12px;font-size:13px;font-weight:500;border-color:var(--linea);color:var(--inchiostro-tenue)}
+  .secondary-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .secondary-row button{
+    flex:1 1 45%;min-height:40px;
+    padding:8px 10px;font-size:13px;font-weight:500;
+    border-color:var(--linea);color:var(--inchiostro);background:var(--bianco-segnavia);
+  }
+  @media (min-width:520px){ .secondary-row button{flex:0 1 auto} }
 
   details.impostazioni{
     border:1px solid var(--linea);border-radius:4px;background:var(--carta-scura);
@@ -216,6 +261,7 @@
 <body>
 
 <header>
+  <button class="btn-help" id="btnHelp" aria-label="Apri la guida" title="Guida">?</button>
   <div class="wrap">
     <div class="eyebrow">Taccuino di bordo · GPS</div>
     <h1 class="display">Diario di <span class="display">Rotta</span></h1>
@@ -262,15 +308,46 @@
     <button class="primary" id="btnTrack">▶ Avvia tracciamento</button>
     <button class="rosso" id="btnSegna">⚑ Segna questo posto</button>
   </div>
-  <div class="secondary-row">
-    <button id="btnDemo">Percorso demo (Lago d'Orta)</button>
-    <button id="btnManuale">Inserisci coordinate</button>
-    <button id="btnExport">Scarica diario (.md)</button>
-    <button id="btnExportHtml">Scarica con foto (.html)</button>
-    <button id="btnReset">Svuota</button>
-  </div>
+  <details class="impostazioni">
+    <summary>Strumenti</summary>
+    <div class="secondary-row">
+      <button id="btnManuale">Inserisci coordinate</button>
+      <button id="btnExport">Scarica diario (.md)</button>
+      <button id="btnExportHtml">Scarica con foto (.html)</button>
+      <button id="btnReset">Svuota</button>
+    </div>
+  </details>
   <input type="file" id="inpFoto" accept="image/*" multiple style="display:none">
   <div class="lightbox" id="lightbox"><img id="lightboxImg" alt="Foto ingrandita"></div>
+
+  <div class="guida" id="guida" role="dialog" aria-modal="true" aria-labelledby="guidaTitolo">
+    <div class="guida-pannello">
+      <button class="guida-chiudi" id="btnChiudiGuida" aria-label="Chiudi la guida">✕</button>
+      <h2 id="guidaTitolo">Guida al Diario di Rotta</h2>
+      <div class="guida-sotto">Il taccuino GPS che racconta i luoghi dove ti fermi.</div>
+
+      <h3>Come funziona</h3>
+      <p>Premi <span class="tasto">▶ Avvia tracciamento</span> e cammina: l'app segue il percorso e conta i chilometri. Quando resti fermo per qualche minuto, registra da sola una tappa e genera un racconto del luogo: nome, ambiente circostante e storia.</p>
+
+      <h3>Tappe</h3>
+      <p><span class="tasto">⚑ Segna questo posto</span> crea subito una tappa dove ti trovi, senza aspettare la sosta automatica. Nelle impostazioni puoi regolare dopo quanti minuti fermo scatta la tappa automatica e il raggio della sosta.</p>
+      <p>Puoi anche inserire coordinate a mano per aggiungere una tappa senza GPS.</p>
+
+      <h3>Foto, note e memo vocali</h3>
+      <p>Ogni tappa ha tre pulsanti: <span class="tasto">📷 Aggiungi foto</span> (apre la fotocamera, tocca una miniatura per ingrandirla), <span class="tasto">✏️ Nota</span> per i tuoi appunti scritti, <span class="tasto">🎙️ Memo</span> per registrare la voce (max 3 minuti; premi <span class="tasto">■ Ferma</span> per chiudere).</p>
+
+      <h3>Racconti AI</h3>
+      <p><span class="tasto">↻ Rigenera</span> rigenera il racconto della tappa; se hai aggiunto foto o note, l'AI le usa per rendere la descrizione fedele a ciò che hai visto. <span class="tasto">✨ Rigenera con foto</span> forza l'uso delle immagini.</p>
+      <p>I racconti richiedono una chiave API Anthropic, da inserire una sola volta nelle impostazioni: resta salvata solo sul tuo dispositivo. Senza chiave, tutto il resto funziona comunque.</p>
+
+      <h3>Salvataggio ed export</h3>
+      <p>Il diario si salva da solo sul dispositivo: puoi chiudere e riaprire quando vuoi. <span class="tasto">Scarica diario (.md)</span> esporta il testo; <span class="tasto">Scarica con foto (.html)</span> crea un file completo di foto e memo vocali, perfetto da archiviare o condividere. <span class="tasto">Svuota</span> cancella tutto definitivamente.</p>
+
+      <h3>Permessi e privacy</h3>
+      <p>Alla prima richiesta il browser chiederà l'accesso a posizione, fotocamera e microfono: servono solo per le funzioni che usi e nulla viene inviato altrove — percorso, foto, note e memo restano sul tuo telefono. Verifica sempre le informazioni storiche generate dall'AI.</p>
+      <p>Se il GPS non parte, controlla che i servizi di localizzazione siano attivi e che il sito abbia il permesso nelle impostazioni del browser.</p>
+    </div>
+  </div>
 
   <details class="impostazioni">
     <summary>Impostazioni rilevamento soste</summary>
@@ -295,7 +372,7 @@
   </details>
 
   <div class="timeline" id="timeline">
-    <div class="vuoto" id="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento, segna un posto o prova il percorso demo.</div>
+    <div class="vuoto" id="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento o segna un posto.</div>
   </div>
 </div>
 
@@ -403,7 +480,7 @@ $('btnTrack').addEventListener('click',()=>{
 
 function startTrack(){
   if(!('geolocation' in navigator)){
-    avviso("Questo ambiente non espone il GPS. Usa il percorso demo, le coordinate manuali, oppure scarica il file HTML e aprilo in Safari/Chrome.");
+    avviso("Questo ambiente non espone il GPS. Usa le coordinate manuali, oppure apri l'app in Safari/Chrome da un sito https.");
     return;
   }
   S.watchId = navigator.geolocation.watchPosition(onPos, onGpsErr, {
@@ -424,7 +501,7 @@ function stopTrack(){
 function onGpsErr(e){
   stopTrack();
   const msg = e.code===1
-    ? "Permesso GPS negato. Se stai usando l'app dentro Claude, il sandbox può bloccare la geolocalizzazione: scarica il file e aprilo direttamente nel browser (o caricalo su un tuo server https). Nel frattempo funzionano demo e coordinate manuali."
+    ? "Permesso GPS negato. Controlla che il sito abbia il permesso di localizzazione nelle impostazioni del browser. Nel frattempo funzionano le coordinate manuali."
     : "GPS non disponibile ("+e.message+"). Riprova all'aperto o usa le coordinate manuali.";
   avviso(msg, 12000);
 }
@@ -475,13 +552,13 @@ $('btnSegna').addEventListener('click',()=>{
       onGpsErr, {enableHighAccuracy:true, timeout:15000}
     );
   } else {
-    avviso("GPS non disponibile: usa le coordinate manuali o il percorso demo.");
+    avviso("GPS non disponibile: usa le coordinate manuali.");
   }
 });
 
 $('btnManuale').addEventListener('click',()=>{
   const r=$('rigaManuale');
-  document.querySelector('details.impostazioni').open=true;
+  $('rigaManuale').closest('details').open=true;
   r.style.display = r.style.display==='none' ? 'flex' : 'none';
 });
 $('btnAggiungiManuale').addEventListener('click',()=>{
@@ -491,18 +568,6 @@ $('btnAggiungiManuale').addEventListener('click',()=>{
     avviso("Coordinate non valide. Esempio: 45.876 e 8.409"); return;
   }
   creaTappa(lat,lon,new Date(),'coordinate manuali');
-});
-
-/* demo: tre tappe sul Lago d'Orta */
-$('btnDemo').addEventListener('click',()=>{
-  const base=Date.now();
-  const demo=[
-    {lat:45.8764, lon:8.4095, dt:0,    et:'demo'},   // Omegna, lungolago
-    {lat:45.7972, lon:8.4051, dt:75,   et:'demo'},   // Sacro Monte di Orta
-    {lat:45.7953, lon:8.3936, dt:150,  et:'demo'}    // Isola di San Giulio
-  ];
-  demo.forEach(d=>creaTappa(d.lat,d.lon,new Date(base - (150-d.dt)*60000),'demo'));
-  avviso("Percorso demo caricato: tre tappe sul Lago d'Orta. Le narrazioni si stanno generando.");
 });
 
 function creaTappa(lat,lon,quando,tipo){
@@ -656,7 +721,7 @@ function renderTimeline(){
   const tl=$('timeline');
   tl.innerHTML='';
   if(!S.entries.length){
-    tl.innerHTML='<div class="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento, segna un posto o prova il percorso demo.</div>';
+    tl.innerHTML='<div class="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento o segna un posto.</div>';
     return;
   }
   let giornoCorrente='';
@@ -938,6 +1003,19 @@ function ridimensiona(file){
 }
 
 $('lightbox').addEventListener('click',()=>$('lightbox').classList.remove('show'));
+
+/* ---------- guida ---------- */
+$('btnHelp').addEventListener('click',()=>{
+  $('guida').classList.add('show');
+  $('btnChiudiGuida').focus();
+});
+$('btnChiudiGuida').addEventListener('click',()=>$('guida').classList.remove('show'));
+$('guida').addEventListener('click',ev=>{
+  if(ev.target===$('guida')) $('guida').classList.remove('show');
+});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){ $('guida').classList.remove('show'); $('lightbox').classList.remove('show'); }
+});
 
 /* export HTML con foto incorporate */
 $('btnExportHtml').addEventListener('click',()=>{
