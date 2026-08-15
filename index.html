@@ -135,8 +135,21 @@
     color:var(--inchiostro-tenue);margin-bottom:3px;font-weight:700;
   }
   .sezione p{font-size:15px}
-  .scheda-piede{padding:0 16px 14px;display:flex;gap:14px;font-size:13px}
-  .scheda-piede a{color:var(--segnavia);font-weight:600;text-decoration:none}
+  .scheda-piede{
+    padding:0 16px 14px;display:flex;flex-wrap:wrap;gap:8px;
+    align-items:center;font-size:13px;
+  }
+  .scheda-piede .btn-foto{
+    flex:1 1 42%;              /* due per riga sui telefoni, si allargano se c'è spazio */
+    min-height:42px;           /* area di tocco comoda */
+    padding:8px 6px;font-size:13px;white-space:nowrap;
+    display:flex;align-items:center;justify-content:center;
+  }
+  @media (min-width:520px){ .scheda-piede .btn-foto{flex:0 1 auto;padding:8px 14px} }
+  .scheda-piede a{
+    flex-basis:100%;text-align:right;margin-top:2px;
+    color:var(--segnavia);font-weight:600;text-decoration:none;
+  }
   .scheda-piede a:hover{text-decoration:underline}
   .caricamento{color:var(--inchiostro-tenue);font-style:italic;font-size:14px;padding:4px 0}
   .caricamento::after{content:"…";animation:puntini 1.2s steps(4) infinite}
@@ -721,7 +734,7 @@ function renderTimeline(){
             ? '<button class="btn-foto rigen" data-id="'+e.id+'">↻ Rigenera</button>':'')+
           (e.foto.length && e.stato!=='caricamento'
             ? '<button class="btn-foto rigenfoto" data-id="'+e.id+'">✨ Rigenera con foto</button>':'')+
-          '<a href="'+maps+'" target="_blank" rel="noopener" style="margin-left:auto">Apri in Maps →</a>'+
+          '<a href="'+maps+'" target="_blank" rel="noopener">Apri in Maps →</a>'+
         '</div>'+
       '</div>';
     tl.appendChild(div);
