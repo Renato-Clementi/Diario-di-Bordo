@@ -347,6 +347,7 @@ async function ripristina(){
     S.entries=(dati.entries||[]).map(e=>({...e, t:new Date(e.t),
       nota:e.nota||'', audio:e.audio||[], foto:e.foto||[],
       stato: e.stato==='caricamento' ? 'errore' : e.stato})); // richieste interrotte -> riprovabili
+    S.entries.sort((a,b)=>b.t-a.t);
     S.path=dati.path||[];
     S.distanza=dati.distanza||0;
     S.contatore=dati.contatore||0;
@@ -500,7 +501,7 @@ function creaTappa(lat,lon,quando,tipo){
     audio:[]   // memo vocali {data(dataURL), mime}
   };
   S.entries.push(e);
-  S.entries.sort((a,b)=>a.t-b.t);
+  S.entries.sort((a,b)=>b.t-a.t); // più recente in alto
   renderTimeline();
   aggiornaStat();
   salva();
@@ -839,9 +840,10 @@ async function toggleRegistrazione(id){
 /* ---------- export ---------- */
 $('btnExport').addEventListener('click',()=>{
   if(!S.entries.length){ avviso("Nessuna tappa da esportare."); return; }
-  let md="# Diario di Rotta — "+dataIT(S.entries[0].t)+"\n\n";
+  const cron=[...S.entries].sort((a,b)=>a.t-b.t); // il diario esportato si legge dall'inizio
+  let md="# Diario di Rotta — "+dataIT(cron[0].t)+"\n\n";
   md+="Percorso totale: "+(S.distanza/1000).toFixed(1)+" km · Tappe: "+S.entries.length+"\n\n---\n\n";
-  for(const e of S.entries){
+  for(const e of cron){
     md+="## "+oraIT(e.t)+" — "+(e.nome||"Tappa")+"\n";
     md+="*Coordinate: "+e.lat.toFixed(5)+", "+e.lon.toFixed(5)+" ("+e.tipo+")*\n\n";
     if(e.nota)     md+="**Appunti.** "+e.nota+"\n\n";
@@ -927,17 +929,18 @@ $('lightbox').addEventListener('click',()=>$('lightbox').classList.remove('show'
 /* export HTML con foto incorporate */
 $('btnExportHtml').addEventListener('click',()=>{
   if(!S.entries.length){ avviso("Nessuna tappa da esportare."); return; }
+  const cron=[...S.entries].sort((a,b)=>a.t-b.t);
   let h='<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width, initial-scale=1">'+
-    '<title>Diario di Rotta — '+dataIT(S.entries[0].t)+'</title>'+
+    '<title>Diario di Rotta — '+dataIT(cron[0].t)+'</title>'+
     '<style>body{font-family:Palatino,Georgia,serif;background:#F3E7CF;color:#4A2E1C;max-width:680px;margin:0 auto;padding:24px 18px;line-height:1.6}'+
     'h1{border-bottom:3px double #4A2E1C;padding-bottom:8px}h2{color:#C05A21;margin-top:34px}'+
     '.meta{color:#8A6B52;font-size:14px}.foto{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}'+
     '.foto img{width:200px;max-width:45%;border-radius:4px;border:1px solid #D8C39A}'+
     'h4{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#8A6B52;margin:14px 0 2px}</style></head><body>'+
-    '<h1>Diario di Rotta</h1><p class="meta">'+esc(dataIT(S.entries[0].t))+
+    '<h1>Diario di Rotta</h1><p class="meta">'+esc(dataIT(cron[0].t))+
     ' · Percorso: '+(S.distanza/1000).toFixed(1).replace('.',',')+' km · Tappe: '+S.entries.length+'</p>';
-  for(const e of S.entries){
+  for(const e of cron){
     h+='<h2>'+oraIT(e.t)+' — '+esc(e.nome||'Tappa')+'</h2>'+
        '<p class="meta">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+' ('+esc(e.tipo)+')</p>';
     if(e.nota)     h+='<h4>Appunti</h4><p style="font-style:italic;border-left:3px solid #6E7F5C;padding-left:10px;white-space:pre-wrap">'+esc(e.nota)+'</p>';
