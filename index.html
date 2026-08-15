@@ -159,6 +159,11 @@
     border-radius:50%;background:var(--inchiostro);color:var(--bianco-segnavia);
     border:2px solid var(--bianco-segnavia);font-size:12px;line-height:1;font-weight:700;
   }
+  .fotosalva{
+    position:absolute;bottom:4px;right:4px;width:26px;height:26px;padding:0;
+    border-radius:50%;background:rgba(74,46,28,.78);color:var(--bianco-segnavia);
+    border:none;font-size:13px;line-height:1;
+  }
   .lightbox{
     position:fixed;inset:0;background:rgba(34,48,63,.92);z-index:50;
     display:none;align-items:center;justify-content:center;padding:20px;
@@ -251,7 +256,7 @@
     <button id="btnExportHtml">Scarica con foto (.html)</button>
     <button id="btnReset">Svuota</button>
   </div>
-  <input type="file" id="inpFoto" accept="image/*" capture="environment" multiple style="display:none">
+  <input type="file" id="inpFoto" accept="image/*" multiple style="display:none">
   <div class="lightbox" id="lightbox"><img id="lightboxImg" alt="Foto ingrandita"></div>
 
   <details class="impostazioni">
@@ -672,6 +677,7 @@ function renderTimeline(){
         '<div class="fotoblocco">'+
           '<img src="'+f+'" alt="Foto tappa" data-id="'+e.id+'" data-i="'+i+'" class="fotoclick">'+
           '<button class="fotoelimina" data-id="'+e.id+'" data-i="'+i+'" aria-label="Elimina foto">×</button>'+
+          '<button class="fotosalva" data-id="'+e.id+'" data-i="'+i+'" aria-label="Salva nel rullino" title="Salva nel rullino">⬇</button>'+
         '</div>').join('')+'</div>';
     }
     let notaHtml='';
@@ -771,6 +777,9 @@ function renderTimeline(){
       $('lightboxImg').src=img.src; $('lightbox').classList.add('show');
     });
   });
+  tl.querySelectorAll('.fotosalva').forEach(b=>{
+    b.addEventListener('click',()=>salvaNelRullino(b.dataset.id, parseInt(b.dataset.i,10)));
+  });
   tl.querySelectorAll('.fotoelimina').forEach(b=>{
     b.addEventListener('click',()=>{
       const e=S.entries.find(x=>x.id===b.dataset.id);
@@ -848,6 +857,36 @@ $('btnExport').addEventListener('click',()=>{
   a.click();
   URL.revokeObjectURL(a.href);
 });
+
+/* ---------- salvataggio foto nel rullino ---------- */
+async function salvaNelRullino(id, i){
+  const e=S.entries.find(x=>x.id===id);
+  if(!e || !e.foto[i]) return;
+  const nomeFile='diario-'+(e.nome||'tappa').replace(/[^\w]+/g,'-').slice(0,40)+
+    '-'+oraIT(e.t).replace(':','')+'.jpg';
+  // dataURL -> File
+  const risp=await fetch(e.foto[i]);
+  const blob=await risp.blob();
+  const file=new File([blob], nomeFile, {type:'image/jpeg'});
+
+  // Web Share con file: su iPhone/Android apre il foglio di condivisione
+  // dove "Salva immagine" la mette nel rullino con un tocco
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title:'Foto del diario'});
+      return;
+    }catch(err){
+      if(err.name==='AbortError') return; // l'utente ha annullato: nessun errore
+      // altri errori: passo al fallback
+    }
+  }
+  // Fallback (desktop o browser senza Web Share): download classico
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=nomeFile;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 /* ---------- gestione foto ---------- */
 $('inpFoto').addEventListener('change', async ev=>{
