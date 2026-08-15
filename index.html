@@ -192,10 +192,13 @@
   }
   @media (min-width:520px){ .scheda-piede .btn-foto{flex:0 1 auto;padding:8px 14px} }
   .scheda-piede a{
-    flex-basis:100%;text-align:right;margin-top:2px;
     color:var(--segnavia);font-weight:600;text-decoration:none;
   }
   .scheda-piede a:hover{text-decoration:underline}
+  .scheda-piede .linkriga{
+    flex-basis:100%;display:flex;justify-content:flex-end;gap:18px;
+    margin-top:2px;flex-wrap:wrap;
+  }
   .caricamento{color:var(--inchiostro-tenue);font-style:italic;font-size:14px;padding:4px 0}
   .caricamento::after{content:"…";animation:puntini 1.2s steps(4) infinite}
   @keyframes puntini{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
@@ -435,7 +438,7 @@ async function ripristina(){
     });
     if(!dati) return;
     S.entries=(dati.entries||[]).map(e=>({...e, t:new Date(e.t),
-      nota:e.nota||'', audio:e.audio||[], foto:e.foto||[],
+      nota:e.nota||'', audio:e.audio||[], foto:e.foto||[], video:e.video||null,
       stato: e.stato==='caricamento' ? 'errore' : e.stato})); // richieste interrotte -> riprovabili
     S.entries.sort((a,b)=>b.t-a.t);
     S.path=dati.path||[];
@@ -576,6 +579,7 @@ function creaTappa(lat,lon,quando,tipo){
     nome:null, ambiente:null, storia:null, stato:'caricamento', tipo,
     foto:[],   // dataURL JPEG ridimensionate
     nota:'',   // appunti personali
+    video:null, // link YouTube del luogo (dal racconto AI)
     audio:[]   // memo vocali {data(dataURL), mime}
   };
   S.entries.push(e);
@@ -601,7 +605,8 @@ Poi rispondi in italiano, SOLO con questo formato esatto, senza altro testo:
 
 NOME: [nome del luogo, breve, es. "Lungolago di Omegna (VB)"]
 AMBIENTE: [3-4 frasi che descrivono l'ambiente circostante: paesaggio, natura, edifici, atmosfera]
-STORIA: [4-6 frasi sulla storia del luogo o della zona, con fatti e date verificabili]`;
+STORIA: [4-6 frasi sulla storia del luogo o della zona, con fatti e date verificabili]
+VIDEO: [cerca su YouTube un video su questo luogo e scegli il più popolare/visto che trovi; riporta SOLO l'URL completo (https://www.youtube.com/watch?v=... o https://youtu.be/...); se non trovi un video affidabile scrivi NESSUNO]`;
 
   // contenuto multimodale: eventuali foto + testo
   const content=[];
@@ -647,6 +652,10 @@ STORIA: [4-6 frasi sulla storia del luogo o della zona, con fatti e date verific
     e.nome=prendi("NOME")||("Luogo a "+e.lat.toFixed(4)+", "+e.lon.toFixed(4));
     e.ambiente=prendi("AMBIENTE")||testo.trim()||"Descrizione non disponibile.";
     e.storia=prendi("STORIA")||"";
+    // video: accetto solo URL YouTube ben formati
+    const v=(prendi("VIDEO")||"").trim();
+    const mVid=v.match(/https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})[^\s")]*/);
+    e.video=mVid ? mVid[0] : null;
     e.fonte='ai';
     e.stato='ok';
   }catch(err){
@@ -799,7 +808,14 @@ function renderTimeline(){
             ? '<button class="btn-foto rigen" data-id="'+e.id+'">↻ Rigenera</button>':'')+
           (e.foto.length && e.stato!=='caricamento'
             ? '<button class="btn-foto rigenfoto" data-id="'+e.id+'">✨ Rigenera con foto</button>':'')+
-          '<a href="'+maps+'" target="_blank" rel="noopener">Apri in Maps →</a>'+
+          '<span class="linkriga">'+
+            (e.stato==='ok'
+              ? (e.video
+                  ? '<a href="'+e.video+'" target="_blank" rel="noopener">▶ Video del luogo</a>'
+                  : '<a href="https://www.youtube.com/results?search_query='+encodeURIComponent(e.nome||'')+'" target="_blank" rel="noopener">▶ Cerca video</a>')
+              : '')+
+            '<a href="'+maps+'" target="_blank" rel="noopener">Apri in Maps →</a>'+
+          '</span>'+
         '</div>'+
       '</div>';
     tl.appendChild(div);
@@ -928,6 +944,7 @@ $('btnExport').addEventListener('click',()=>{
     if(e.audio.length) md+="*("+e.audio.length+" memo vocali — inclusi nell'export .html)*\n\n";
     if(e.ambiente) md+="**Ambiente.** "+e.ambiente+"\n\n";
     if(e.storia)   md+="**Storia.** "+e.storia+"\n\n";
+    if(e.video)    md+="**Video.** "+e.video+"\n\n";
     md+="---\n\n";
   }
   const blob=new Blob([md],{type:"text/markdown"});
@@ -1039,6 +1056,7 @@ $('btnExportHtml').addEventListener('click',()=>{
     if(e.foto.length) h+='<div class="foto">'+e.foto.map(f=>'<img src="'+f+'" alt="Foto">').join('')+'</div>';
     if(e.ambiente) h+='<h4>Ambiente</h4><p>'+esc(e.ambiente)+'</p>';
     if(e.storia)   h+='<h4>Storia</h4><p>'+esc(e.storia)+'</p>';
+    if(e.video)    h+='<p><a href="'+e.video+'" style="color:#C05A21;font-weight:600">▶ Video del luogo</a></p>';
   }
   h+='</body></html>';
   const blob=new Blob([h],{type:"text/html"});
