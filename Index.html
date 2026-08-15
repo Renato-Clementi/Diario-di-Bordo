@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Diario di Rotta — Taccuino GPS</title>
+<style>
+  :root{
+    --carta:#F4F2E9;
+    --carta-scura:#EAE6D8;
+    --inchiostro:#22303F;      /* blu carta nautica */
+    --inchiostro-tenue:#5A6675;
+    --segnavia:#B5432A;        /* rosso segnavia CAI */
+    --bianco-segnavia:#FCFBF5;
+    --linea:#C9C3B2;
+    --ok:#3E6B4F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--carta);
+    color:var(--inchiostro);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:16px;line-height:1.55;
+    padding-bottom:40px;
+  }
+  .display{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
+  .mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+
+  header{
+    padding:26px 20px 18px;
+    border-bottom:3px double var(--inchiostro);
+    background:
+      repeating-linear-gradient(90deg,transparent 0 118px, rgba(34,48,63,.05) 118px 120px),
+      var(--carta);
+  }
+  .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--segnavia);font-weight:600}
+  h1{font-size:30px;line-height:1.1;font-weight:600;margin-top:4px}
+  h1 .display{font-style:italic}
+  .sub{margin-top:6px;color:var(--inchiostro-tenue);font-size:13.5px}
+
+  .wrap{max-width:680px;margin:0 auto;padding:0 16px}
+
+  /* pannello di stato */
+  .statusbar{
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    margin:16px 0 4px;font-size:13px;color:var(--inchiostro-tenue);
+  }
+  .dot{width:9px;height:9px;border-radius:50%;background:#9AA3AE;display:inline-block;flex:none}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 4px rgba(62,107,79,.18);animation:pulse 2s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 7px rgba(62,107,79,.05)}}
+  .stat{margin-left:auto}
+  .stat b{color:var(--inchiostro)}
+
+  /* controlli */
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px}
+  button{
+    font:inherit;cursor:pointer;border-radius:4px;
+    padding:11px 16px;font-size:14.5px;font-weight:600;
+    border:1.5px solid var(--inchiostro);
+    background:var(--carta);color:var(--inchiostro);
+    transition:transform .08s ease, background .15s;
+  }
+  button:active{transform:scale(.97)}
+  button.primary{background:var(--inchiostro);color:var(--bianco-segnavia)}
+  button.rosso{background:var(--segnavia);border-color:var(--segnavia);color:var(--bianco-segnavia)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible{outline:3px solid var(--segnavia);outline-offset:2px}
+  .secondary-row{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
+  .secondary-row button{padding:8px 12px;font-size:13px;font-weight:500;border-color:var(--linea);color:var(--inchiostro-tenue)}
+
+  details.impostazioni{
+    border:1px solid var(--linea);border-radius:4px;background:var(--carta-scura);
+    padding:10px 14px;margin:8px 0 4px;font-size:13.5px;
+  }
+  details.impostazioni summary{cursor:pointer;font-weight:600;color:var(--inchiostro-tenue)}
+  .campo{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .campo label{min-width:190px}
+  .campo input{
+    font:inherit;padding:7px 9px;border:1px solid var(--linea);border-radius:3px;
+    background:#fff;width:110px;
+  }
+  .campo input:focus-visible{outline:2px solid var(--segnavia)}
+
+  .avviso{
+    border-left:4px solid var(--segnavia);background:var(--carta-scura);
+    padding:10px 14px;font-size:13.5px;margin:10px 0;border-radius:0 4px 4px 0;
+    display:none;
+  }
+  .avviso.show{display:block}
+
+  /* timeline = sentiero con segnavia */
+  .timeline{position:relative;margin:26px 0 10px;padding-left:34px}
+  .timeline::before{
+    content:"";position:absolute;left:11px;top:6px;bottom:6px;width:6px;
+    background:var(--segnavia);border-radius:3px;
+  }
+  .timeline::after{ /* tratteggio bianco = segnavia CAI */
+    content:"";position:absolute;left:13px;top:6px;bottom:6px;width:2px;
+    background:repeating-linear-gradient(180deg,var(--bianco-segnavia) 0 10px,transparent 10px 22px);
+  }
+  .vuoto{color:var(--inchiostro-tenue);font-size:14px;padding:8px 0 8px 2px;font-style:italic}
+
+  .tappa{position:relative;margin-bottom:26px;animation:comparsa .4s ease}
+  @keyframes comparsa{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){
+    .tappa{animation:none}.dot.on{animation:none}
+  }
+  .tappa::before{ /* pin waypoint */
+    content:"";position:absolute;left:-31px;top:14px;width:16px;height:16px;
+    background:var(--bianco-segnavia);border:4px solid var(--inchiostro);border-radius:50%;
+    z-index:1;
+  }
+  .scheda{
+    background:#FFFEF9;border:1px solid var(--linea);border-radius:5px;
+    box-shadow:2px 3px 0 rgba(34,48,63,.10);
+    overflow:hidden;
+  }
+  .scheda-testata{
+    display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+    padding:12px 16px 8px;border-bottom:1px solid var(--carta-scura);
+  }
+  .ora{font-size:20px;font-weight:700;letter-spacing:.02em}
+  .coord{font-size:11.5px;color:var(--inchiostro-tenue)}
+  .badge{
+    margin-left:auto;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--segnavia);font-weight:700;
+  }
+  .scheda-corpo{padding:12px 16px 14px}
+  .nomeluogo{font-size:20px;font-weight:600;margin-bottom:8px}
+  .sezione{margin-top:10px}
+  .sezione h4{
+    font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--inchiostro-tenue);margin-bottom:3px;font-weight:700;
+  }
+  .sezione p{font-size:15px}
+  .scheda-piede{padding:0 16px 14px;display:flex;gap:14px;font-size:13px}
+  .scheda-piede a{color:var(--segnavia);font-weight:600;text-decoration:none}
+  .scheda-piede a:hover{text-decoration:underline}
+  .caricamento{color:var(--inchiostro-tenue);font-style:italic;font-size:14px;padding:4px 0}
+  .caricamento::after{content:"…";animation:puntini 1.2s steps(4) infinite}
+  @keyframes puntini{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+  .errore{color:var(--segnavia);font-size:13.5px}
+  .riprova{margin-top:6px;padding:6px 10px;font-size:12.5px}
+
+  footer{margin-top:30px;padding:16px;text-align:center;color:var(--inchiostro-tenue);font-size:12px;border-top:1px solid var(--linea)}
+
+  /* foto */
+  .fotogriglia{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 12px}
+  .fotoblocco{position:relative}
+  .fotoblocco img{
+    width:86px;height:86px;object-fit:cover;border-radius:4px;display:block;
+    border:1px solid var(--linea);box-shadow:1px 2px 0 rgba(34,48,63,.12);
+    cursor:pointer;background:var(--carta-scura);
+  }
+  .fotoelimina{
+    position:absolute;top:-7px;right:-7px;width:22px;height:22px;padding:0;
+    border-radius:50%;background:var(--inchiostro);color:var(--bianco-segnavia);
+    border:2px solid var(--bianco-segnavia);font-size:12px;line-height:1;font-weight:700;
+  }
+  .lightbox{
+    position:fixed;inset:0;background:rgba(34,48,63,.92);z-index:50;
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .lightbox.show{display:flex}
+  .lightbox img{max-width:100%;max-height:90vh;border-radius:4px}
+  .btn-foto{padding:6px 10px;font-size:12.5px;font-weight:600;border-color:var(--linea)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Taccuino di bordo · GPS</div>
+    <h1 class="display">Diario di <span class="display">Rotta</span></h1>
+    <div class="sub">Traccia il percorso, riconosce le soste e racconta ambiente e storia di ogni luogo.</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="statusbar">
+    <span class="dot" id="gpsDot"></span>
+    <span id="gpsStato">GPS non attivo</span>
+    <span class="stat">Percorso: <b id="statDist">0,0 km</b> · Tappe: <b id="statTappe">0</b></span>
+  </div>
+
+  <div class="avviso" id="avviso"></div>
+
+  <div class="controls">
+    <button class="primary" id="btnTrack">▶ Avvia tracciamento</button>
+    <button class="rosso" id="btnSegna">⚑ Segna questo posto</button>
+  </div>
+  <div class="secondary-row">
+    <button id="btnDemo">Percorso demo (Lago d'Orta)</button>
+    <button id="btnManuale">Inserisci coordinate</button>
+    <button id="btnExport">Scarica diario (.md)</button>
+    <button id="btnExportHtml">Scarica con foto (.html)</button>
+    <button id="btnReset">Svuota</button>
+  </div>
+  <input type="file" id="inpFoto" accept="image/*" capture="environment" multiple style="display:none">
+  <div class="lightbox" id="lightbox"><img id="lightboxImg" alt="Foto ingrandita"></div>
+
+  <details class="impostazioni">
+    <summary>Impostazioni rilevamento soste</summary>
+    <div class="campo">
+      <label for="inpMin">Minuti fermi per registrare una tappa</label>
+      <input id="inpMin" type="number" min="1" max="60" value="5">
+    </div>
+    <div class="campo">
+      <label for="inpRaggio">Raggio della sosta (metri)</label>
+      <input id="inpRaggio" type="number" min="20" max="500" value="80">
+    </div>
+    <div class="campo">
+      <label for="inpKey">Chiave API Anthropic (per i racconti AI)</label>
+      <input id="inpKey" type="password" placeholder="sk-ant-…" style="width:220px" autocomplete="off">
+    </div>
+    <div class="campo" id="rigaManuale" style="display:none">
+      <label for="inpLat">Coordinate manuali (lat, lon)</label>
+      <input id="inpLat" type="text" placeholder="45.876" inputmode="decimal">
+      <input id="inpLon" type="text" placeholder="8.409" inputmode="decimal">
+      <button id="btnAggiungiManuale" style="padding:7px 12px;font-size:13px">Aggiungi tappa</button>
+    </div>
+  </details>
+
+  <div class="timeline" id="timeline">
+    <div class="vuoto" id="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento, segna un posto o prova il percorso demo.</div>
+  </div>
+</div>
+
+<footer>Versione condivisibile · I racconti richiedono una chiave API Anthropic (salvata solo su questo dispositivo). Verifica sempre le informazioni storiche.</footer>
+
+<script>
+"use strict";
+try{
+  document.addEventListener('DOMContentLoaded',()=>{
+    const k=localStorage.getItem('dr_key');
+    if(k) document.getElementById('inpKey').value=k;
+  });
+}catch(_){}
+
+/* ---------- stato ---------- */
+const S = {
+  tracking:false, watchId:null,
+  path:[],            // {lat,lon,t}
+  distanza:0,         // metri
+  anchor:null,        // punto di riferimento per la sosta
+  anchorT:0,
+  ultimaTappaPos:null,
+  entries:[],         // {id,t,lat,lon,nome,ambiente,storia,stato}
+  contatore:0
+};
+
+const $ = id => document.getElementById(id);
+
+/* ---------- utilità ---------- */
+function haversine(a,b){
+  const R=6371000, r=x=>x*Math.PI/180;
+  const dLat=r(b.lat-a.lat), dLon=r(b.lon-a.lon);
+  const h=Math.sin(dLat/2)**2 + Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+const oraIT = d => d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+const dataIT = d => d.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+function avviso(msg, ms=6000){
+  const el=$('avviso'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'), ms);
+}
+function aggiornaStat(){
+  $('statDist').textContent=(S.distanza/1000).toFixed(1).replace('.',',')+' km';
+  $('statTappe').textContent=S.entries.length;
+}
+
+/* ---------- tracciamento GPS ---------- */
+$('btnTrack').addEventListener('click',()=>{
+  if(S.tracking){ stopTrack(); } else { startTrack(); }
+});
+
+function startTrack(){
+  if(!('geolocation' in navigator)){
+    avviso("Questo ambiente non espone il GPS. Usa il percorso demo, le coordinate manuali, oppure scarica il file HTML e aprilo in Safari/Chrome.");
+    return;
+  }
+  S.watchId = navigator.geolocation.watchPosition(onPos, onGpsErr, {
+    enableHighAccuracy:true, maximumAge:5000, timeout:20000
+  });
+  S.tracking=true;
+  $('btnTrack').textContent='■ Ferma tracciamento';
+  $('gpsDot').classList.add('on');
+  $('gpsStato').textContent='In ascolto del GPS…';
+}
+function stopTrack(){
+  if(S.watchId!==null) navigator.geolocation.clearWatch(S.watchId);
+  S.watchId=null; S.tracking=false; S.anchor=null;
+  $('btnTrack').textContent='▶ Avvia tracciamento';
+  $('gpsDot').classList.remove('on');
+  $('gpsStato').textContent='GPS in pausa';
+}
+function onGpsErr(e){
+  stopTrack();
+  const msg = e.code===1
+    ? "Permesso GPS negato. Se stai usando l'app dentro Claude, il sandbox può bloccare la geolocalizzazione: scarica il file e aprilo direttamente nel browser (o caricalo su un tuo server https). Nel frattempo funzionano demo e coordinate manuali."
+    : "GPS non disponibile ("+e.message+"). Riprova all'aperto o usa le coordinate manuali.";
+  avviso(msg, 12000);
+}
+
+function onPos(pos){
+  const p={lat:pos.coords.latitude, lon:pos.coords.longitude, t:Date.now()};
+  $('gpsStato').textContent='GPS attivo · precisione '+Math.round(pos.coords.accuracy)+' m';
+
+  const ultimo=S.path[S.path.length-1];
+  if(ultimo){
+    const d=haversine(ultimo,p);
+    if(d<3) { checkSosta(p); return; }   // rumore
+    S.distanza+=d;
+  }
+  S.path.push(p);
+  aggiornaStat();
+  checkSosta(p);
+}
+
+/* rilevamento sosta: fermo entro il raggio per N minuti -> tappa */
+function checkSosta(p){
+  const raggio=parseFloat($('inpRaggio').value)||80;
+  const minuti=parseFloat($('inpMin').value)||5;
+
+  if(!S.anchor || haversine(S.anchor,p)>raggio){
+    S.anchor=p; S.anchorT=p.t; return;
+  }
+  const fermoDa=(p.t-S.anchorT)/60000;
+  if(fermoDa>=minuti){
+    // evita doppioni: nuova tappa solo se lontana dall'ultima registrata
+    if(!S.ultimaTappaPos || haversine(S.ultimaTappaPos,S.anchor)>raggio*1.5){
+      S.ultimaTappaPos={...S.anchor};
+      creaTappa(S.anchor.lat, S.anchor.lon, new Date(), 'sosta rilevata');
+    }
+    S.anchorT=p.t; // non ripetere finché non ci si sposta
+  }
+}
+
+/* ---------- creazione tappe ---------- */
+$('btnSegna').addEventListener('click',()=>{
+  const ultimo=S.path[S.path.length-1];
+  if(ultimo){ creaTappa(ultimo.lat, ultimo.lon, new Date(), 'segnato a mano'); return; }
+  if('geolocation' in navigator){
+    $('gpsStato').textContent='Rilevo la posizione…';
+    navigator.geolocation.getCurrentPosition(
+      pos=>creaTappa(pos.coords.latitude,pos.coords.longitude,new Date(),'segnato a mano'),
+      onGpsErr, {enableHighAccuracy:true, timeout:15000}
+    );
+  } else {
+    avviso("GPS non disponibile: usa le coordinate manuali o il percorso demo.");
+  }
+});
+
+$('btnManuale').addEventListener('click',()=>{
+  const r=$('rigaManuale');
+  document.querySelector('details.impostazioni').open=true;
+  r.style.display = r.style.display==='none' ? 'flex' : 'none';
+});
+$('btnAggiungiManuale').addEventListener('click',()=>{
+  const lat=parseFloat($('inpLat').value.replace(',','.'));
+  const lon=parseFloat($('inpLon').value.replace(',','.'));
+  if(isNaN(lat)||isNaN(lon)||Math.abs(lat)>90||Math.abs(lon)>180){
+    avviso("Coordinate non valide. Esempio: 45.876 e 8.409"); return;
+  }
+  creaTappa(lat,lon,new Date(),'coordinate manuali');
+});
+
+/* demo: tre tappe sul Lago d'Orta */
+$('btnDemo').addEventListener('click',()=>{
+  const base=Date.now();
+  const demo=[
+    {lat:45.8764, lon:8.4095, dt:0,    et:'demo'},   // Omegna, lungolago
+    {lat:45.7972, lon:8.4051, dt:75,   et:'demo'},   // Sacro Monte di Orta
+    {lat:45.7953, lon:8.3936, dt:150,  et:'demo'}    // Isola di San Giulio
+  ];
+  demo.forEach(d=>creaTappa(d.lat,d.lon,new Date(base - (150-d.dt)*60000),'demo'));
+  avviso("Percorso demo caricato: tre tappe sul Lago d'Orta. Le narrazioni si stanno generando.");
+});
+
+function creaTappa(lat,lon,quando,tipo){
+  const e={
+    id:'t'+(++S.contatore), t:quando, lat, lon,
+    nome:null, ambiente:null, storia:null, stato:'caricamento', tipo,
+    foto:[]   // dataURL JPEG ridimensionate
+  };
+  S.entries.push(e);
+  S.entries.sort((a,b)=>a.t-b.t);
+  renderTimeline();
+  aggiornaStat();
+  generaRacconto(e);
+}
+
+/* ---------- narrazione con Claude + web search ---------- */
+async function generaRacconto(e, usaFoto=false){
+  e.stato='caricamento'; renderTimeline();
+  const conFoto = usaFoto && e.foto.length>0;
+  const prompt =
+`Coordinate GPS: latitudine ${e.lat.toFixed(5)}, longitudine ${e.lon.toFixed(5)}.
+Usa la ricerca web per identificare con precisione questo luogo (località, punto di interesse o zona).`+
+(conFoto?`
+Ho allegato ${e.foto.length} foto scattate sul posto: usale per rendere la descrizione dell'ambiente concreta e fedele a ciò che si vede (luce, colori, dettagli, atmosfera).`:``)+`
+Poi rispondi in italiano, SOLO con questo formato esatto, senza altro testo:
+
+NOME: [nome del luogo, breve, es. "Lungolago di Omegna (VB)"]
+AMBIENTE: [3-4 frasi che descrivono l'ambiente circostante: paesaggio, natura, edifici, atmosfera]
+STORIA: [4-6 frasi sulla storia del luogo o della zona, con fatti e date verificabili]`;
+
+  // contenuto multimodale: eventuali foto + testo
+  const content=[];
+  if(conFoto){
+    for(const f of e.foto.slice(0,4)){ // max 4 foto per richiesta
+      content.push({type:"image",source:{type:"base64",media_type:"image/jpeg",data:f.split(",")[1]}});
+    }
+  }
+  content.push({type:"text",text:prompt});
+
+  const chiave=($('inpKey').value||'').trim();
+  if(!chiave){
+    e.stato='ok';
+    e.nome="Tappa "+e.lat.toFixed(4)+", "+e.lon.toFixed(4);
+    e.ambiente="Racconto AI non attivo: inserisci la tua chiave API Anthropic nelle impostazioni, poi premi «Rigenera con foto» (o riprova). Diario, GPS, foto ed export funzionano comunque.";
+    e.storia="";
+    renderTimeline();
+    return;
+  }
+  try{ localStorage.setItem('dr_key',chiave); }catch(_){}
+
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key":chiave,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body:JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        messages:[{role:"user",content}],
+        tools:[{type:"web_search_20250305",name:"web_search"}]
+      })
+    });
+    const data=await res.json();
+    if(!data.content) throw new Error(data.error?.message||"risposta vuota");
+
+    const testo=data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    const prendi=(tag)=>{
+      const m=testo.match(new RegExp(tag+":\\s*([\\s\\S]*?)(?=\\n[A-Z]+:|$)"));
+      return m ? m[1].trim() : null;
+    };
+    e.nome=prendi("NOME")||("Luogo a "+e.lat.toFixed(4)+", "+e.lon.toFixed(4));
+    e.ambiente=prendi("AMBIENTE")||testo.trim()||"Descrizione non disponibile.";
+    e.storia=prendi("STORIA")||"";
+    e.stato='ok';
+  }catch(err){
+    console.error(err);
+    e.stato='errore';
+    e.nome="Tappa "+e.lat.toFixed(4)+", "+e.lon.toFixed(4);
+  }
+  renderTimeline();
+}
+
+/* ---------- rendering ---------- */
+function renderTimeline(){
+  const tl=$('timeline');
+  tl.innerHTML='';
+  if(!S.entries.length){
+    tl.innerHTML='<div class="vuoto">Il sentiero è ancora bianco. Avvia il tracciamento, segna un posto o prova il percorso demo.</div>';
+    return;
+  }
+  for(const e of S.entries){
+    const div=document.createElement('div');
+    div.className='tappa';
+    const maps='https://maps.google.com/?q='+e.lat+','+e.lon;
+    let corpo='';
+    if(e.stato==='caricamento'){
+      corpo='<div class="caricamento">Consulto le carte e gli archivi</div>';
+    }else if(e.stato==='errore'){
+      corpo='<div class="errore">Non sono riuscito a generare il racconto (rete o API non raggiungibile).</div>'+
+            '<button class="riprova" data-id="'+e.id+'">Riprova</button>';
+    }else{
+      corpo='<div class="nomeluogo display">'+esc(e.nome)+'</div>'+
+        (e.ambiente?'<div class="sezione"><h4>Ambiente</h4><p>'+esc(e.ambiente)+'</p></div>':'')+
+        (e.storia?'<div class="sezione"><h4>Storia</h4><p>'+esc(e.storia)+'</p></div>':'');
+    }
+    let fotoHtml='';
+    if(e.foto.length){
+      fotoHtml='<div class="fotogriglia">'+e.foto.map((f,i)=>
+        '<div class="fotoblocco">'+
+          '<img src="'+f+'" alt="Foto tappa" data-id="'+e.id+'" data-i="'+i+'" class="fotoclick">'+
+          '<button class="fotoelimina" data-id="'+e.id+'" data-i="'+i+'" aria-label="Elimina foto">×</button>'+
+        '</div>').join('')+'</div>';
+    }
+    div.innerHTML=
+      '<div class="scheda">'+
+        '<div class="scheda-testata">'+
+          '<span class="ora mono">'+oraIT(e.t)+'</span>'+
+          '<span class="coord mono">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+'</span>'+
+          '<span class="badge">'+esc(e.tipo)+'</span>'+
+        '</div>'+
+        '<div class="scheda-corpo">'+corpo+'</div>'+
+        fotoHtml+
+        '<div class="scheda-piede">'+
+          '<button class="btn-foto aggfoto" data-id="'+e.id+'">📷 Aggiungi foto</button>'+
+          (e.stato!=='caricamento'
+            ? '<button class="btn-foto rigen" data-id="'+e.id+'">↻ Rigenera</button>':'')+
+          (e.foto.length && e.stato!=='caricamento'
+            ? '<button class="btn-foto rigenfoto" data-id="'+e.id+'">✨ Rigenera con foto</button>':'')+
+          '<a href="'+maps+'" target="_blank" rel="noopener" style="margin-left:auto">Apri in Maps →</a>'+
+        '</div>'+
+      '</div>';
+    tl.appendChild(div);
+  }
+  tl.querySelectorAll('.riprova').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const e=S.entries.find(x=>x.id===b.dataset.id);
+      if(e) generaRacconto(e);
+    });
+  });
+  tl.querySelectorAll('.aggfoto').forEach(b=>{
+    b.addEventListener('click',()=>{ S.fotoTarget=b.dataset.id; $('inpFoto').click(); });
+  });
+  tl.querySelectorAll('.rigen').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const e=S.entries.find(x=>x.id===b.dataset.id);
+      if(e) generaRacconto(e, e.foto.length>0);
+    });
+  });
+  tl.querySelectorAll('.rigenfoto').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const e=S.entries.find(x=>x.id===b.dataset.id);
+      if(e) generaRacconto(e,true);
+    });
+  });
+  tl.querySelectorAll('.fotoclick').forEach(img=>{
+    img.addEventListener('click',()=>{
+      $('lightboxImg').src=img.src; $('lightbox').classList.add('show');
+    });
+  });
+  tl.querySelectorAll('.fotoelimina').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const e=S.entries.find(x=>x.id===b.dataset.id);
+      if(e){ e.foto.splice(parseInt(b.dataset.i,10),1); renderTimeline(); }
+    });
+  });
+}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+
+/* ---------- export ---------- */
+$('btnExport').addEventListener('click',()=>{
+  if(!S.entries.length){ avviso("Nessuna tappa da esportare."); return; }
+  let md="# Diario di Rotta — "+dataIT(S.entries[0].t)+"\n\n";
+  md+="Percorso totale: "+(S.distanza/1000).toFixed(1)+" km · Tappe: "+S.entries.length+"\n\n---\n\n";
+  for(const e of S.entries){
+    md+="## "+oraIT(e.t)+" — "+(e.nome||"Tappa")+"\n";
+    md+="*Coordinate: "+e.lat.toFixed(5)+", "+e.lon.toFixed(5)+" ("+e.tipo+")*\n\n";
+    if(e.ambiente) md+="**Ambiente.** "+e.ambiente+"\n\n";
+    if(e.storia)   md+="**Storia.** "+e.storia+"\n\n";
+    md+="---\n\n";
+  }
+  const blob=new Blob([md],{type:"text/markdown"});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download="diario-di-rotta.md";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+/* ---------- gestione foto ---------- */
+$('inpFoto').addEventListener('change', async ev=>{
+  const e=S.entries.find(x=>x.id===S.fotoTarget);
+  if(!e) return;
+  for(const file of ev.target.files){
+    try{ e.foto.push(await ridimensiona(file)); }
+    catch(err){ avviso("Impossibile leggere una delle foto."); }
+  }
+  ev.target.value='';
+  renderTimeline();
+});
+
+/* ridimensiona a max 1280px lato lungo, JPEG q0.8 (memoria + payload API contenuti) */
+function ridimensiona(file){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const MAX=1280;
+      let w=img.width,h=img.height;
+      const scala=Math.min(1, MAX/Math.max(w,h));
+      w=Math.round(w*scala); h=Math.round(h*scala);
+      const c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',0.8));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('lettura fallita'));};
+    img.src=url;
+  });
+}
+
+$('lightbox').addEventListener('click',()=>$('lightbox').classList.remove('show'));
+
+/* export HTML con foto incorporate */
+$('btnExportHtml').addEventListener('click',()=>{
+  if(!S.entries.length){ avviso("Nessuna tappa da esportare."); return; }
+  let h='<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+    '<title>Diario di Rotta — '+dataIT(S.entries[0].t)+'</title>'+
+    '<style>body{font-family:Palatino,Georgia,serif;background:#F4F2E9;color:#22303F;max-width:680px;margin:0 auto;padding:24px 18px;line-height:1.6}'+
+    'h1{border-bottom:3px double #22303F;padding-bottom:8px}h2{color:#B5432A;margin-top:34px}'+
+    '.meta{color:#5A6675;font-size:14px}.foto{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}'+
+    '.foto img{width:200px;max-width:45%;border-radius:4px;border:1px solid #C9C3B2}'+
+    'h4{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#5A6675;margin:14px 0 2px}</style></head><body>'+
+    '<h1>Diario di Rotta</h1><p class="meta">'+esc(dataIT(S.entries[0].t))+
+    ' · Percorso: '+(S.distanza/1000).toFixed(1).replace('.',',')+' km · Tappe: '+S.entries.length+'</p>';
+  for(const e of S.entries){
+    h+='<h2>'+oraIT(e.t)+' — '+esc(e.nome||'Tappa')+'</h2>'+
+       '<p class="meta">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+' ('+esc(e.tipo)+')</p>';
+    if(e.foto.length) h+='<div class="foto">'+e.foto.map(f=>'<img src="'+f+'" alt="Foto">').join('')+'</div>';
+    if(e.ambiente) h+='<h4>Ambiente</h4><p>'+esc(e.ambiente)+'</p>';
+    if(e.storia)   h+='<h4>Storia</h4><p>'+esc(e.storia)+'</p>';
+  }
+  h+='</body></html>';
+  const blob=new Blob([h],{type:"text/html"});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download="diario-di-rotta.html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$('btnReset').addEventListener('click',()=>{
+  if(!confirm("Svuotare il diario e il percorso?")) return;
+  S.path=[];S.distanza=0;S.entries=[];S.anchor=null;S.ultimaTappaPos=null;
+  renderTimeline();aggiornaStat();
+});
+</script>
+</body>
+</html>
