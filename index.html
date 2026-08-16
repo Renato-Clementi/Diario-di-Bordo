@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Diario di Rotta — Taccuino GPS</title>
+<meta name="description" content="Traccia il percorso, riconosce le soste e racconta ambiente e storia di ogni luogo. Con foto, note e memo vocali.">
+
+<!-- Anteprima link (WhatsApp, Telegram, social) — ⚠️ sostituire TUO-DOMINIO con l'URL reale al deploy -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Diario di Rotta — Taccuino GPS">
+<meta property="og:description" content="Ogni sosta diventa un racconto: ambiente, storia, foto e voce.">
+<meta property="og:image" content="https://TUO-DOMINIO/diario/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://TUO-DOMINIO/diario/">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Icone -->
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root{
     --carta:#F3E7CF;           /* sabbia calda */
@@ -136,6 +151,63 @@
     display:none;
   }
   .avviso.show{display:block}
+
+  /* bussola a nastro — sempre visibile */
+  .bussola-box{
+    display:flex;flex-direction:column;gap:8px;
+    margin:12px 0 4px;padding:12px 14px;
+    background:var(--carta-scura);border:1px solid var(--linea);border-radius:6px;
+  }
+  .nastro-attiva{ /* velo di attivazione (solo iOS, che esige un tocco) */
+    position:absolute;inset:0;z-index:3;border:none;border-radius:6px;
+    background:rgba(233,216,180,.88);color:var(--inchiostro);
+    font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .nastro-attiva:focus-visible{outline:3px solid var(--segnavia);outline-offset:-3px}
+  .bussola-testa{display:flex;align-items:baseline;gap:12px}
+  .bussola-gradi{font-family:ui-monospace,Menlo,monospace;font-size:26px;font-weight:700;line-height:1}
+  .bussola-card{font-size:14px;color:var(--inchiostro-tenue)}
+  .nastro-vp{
+    position:relative;height:60px;overflow:hidden;
+    background:var(--bianco-segnavia);border:1px solid var(--linea);border-radius:6px;
+  }
+  .nastro{
+    position:absolute;top:0;left:0;height:100%;
+    will-change:transform;transition:transform .12s linear;
+  }
+  .tick{position:absolute;bottom:0;width:2px;background:var(--linea)}
+  .tick.t5{height:10px}
+  .tick.t15{height:16px;background:var(--inchiostro-tenue)}
+  .tick.t45{height:22px;background:var(--canyon-2);width:2.5px}
+  .tick-lbl{
+    position:absolute;top:7px;transform:translateX(-50%);
+    font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--inchiostro-tenue);
+    white-space:nowrap;
+  }
+  .tick-lbl.card{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    font-size:19px;font-weight:700;color:var(--inchiostro);top:5px;
+  }
+  .tick-lbl.card.nord{color:var(--segnavia)}
+  .ago-centro{
+    position:absolute;left:50%;top:0;bottom:0;width:0;
+    transform:translateX(-50%);pointer-events:none;z-index:2;
+  }
+  .ago-centro::before{ /* triangolino in alto */
+    content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    border-left:8px solid transparent;border-right:8px solid transparent;
+    border-top:10px solid var(--segnavia);
+  }
+  .ago-centro::after{ /* linea verticale */
+    content:"";position:absolute;top:9px;bottom:0;left:50%;
+    width:2.5px;transform:translateX(-50%);background:var(--segnavia);
+  }
+  .nastro-sfuma{ /* dissolvenza ai bordi del nastro */
+    position:absolute;inset:0;pointer-events:none;z-index:1;border-radius:6px;
+    background:linear-gradient(90deg,var(--bianco-segnavia) 0,transparent 12%,transparent 88%,var(--bianco-segnavia) 100%);
+  }
+  .bussola-nota{font-size:11.5px;color:var(--inchiostro-tenue);font-style:italic}
+  @media (prefers-reduced-motion: reduce){ .nastro{transition:none} }
 
   /* timeline = sentiero con segnavia */
   .timeline{position:relative;margin:26px 0 10px;padding-left:36px}
@@ -302,7 +374,7 @@
   <div class="statusbar">
     <span class="dot" id="gpsDot"></span>
     <span id="gpsStato">GPS non attivo</span>
-    <span class="stat">Percorso: <b id="statDist">0,0 km</b> · Tappe: <b id="statTappe">0</b></span>
+    <span class="stat">Percorso: <b id="statDist">0,0 km</b> · Tappe: <b id="statTappe">0</b><span id="statQuota"></span></span>
   </div>
 
   <div class="avviso" id="avviso"></div>
@@ -310,6 +382,20 @@
   <div class="controls">
     <button class="primary" id="btnTrack">▶ Avvia tracciamento</button>
     <button class="rosso" id="btnSegna">⚑ Segna questo posto</button>
+  </div>
+
+  <div class="bussola-box" id="bussolaBox" aria-live="off">
+    <div class="bussola-testa">
+      <div class="bussola-gradi" id="busGradi">—°</div>
+      <div class="bussola-card" id="busCard">In attesa del sensore…</div>
+    </div>
+    <div class="nastro-vp" id="nastroVp">
+      <div class="nastro" id="nastro"></div>
+      <div class="nastro-sfuma"></div>
+      <div class="ago-centro"></div>
+      <button class="nastro-attiva" id="nastroAttiva" hidden>🧭 Tocca per attivare la bussola</button>
+    </div>
+    <div class="bussola-nota">Tieni il telefono in piano. Se la direzione sbanda, disegna un 8 in aria per calibrare.</div>
   </div>
   <details class="impostazioni">
     <summary>Strumenti</summary>
@@ -342,6 +428,9 @@
       <h3>Racconti AI</h3>
       <p><span class="tasto">↻ Rigenera</span> rigenera il racconto della tappa; se hai aggiunto foto o note, l'AI le usa per rendere la descrizione fedele a ciò che hai visto. <span class="tasto">✨ Rigenera con foto</span> forza l'uso delle immagini.</p>
       <p>I racconti richiedono una chiave API Anthropic, da inserire una sola volta nelle impostazioni: resta salvata solo sul tuo dispositivo. Senza chiave, tutto il resto funziona comunque.</p>
+
+      <h3>Bussola</h3>
+      <p>Il pulsante <span class="tasto">🧭</span> apre la bussola: un nastro graduato scorre dietro l'ago fisso al centro, mostrando in tempo reale la direzione che stai seguendo, in gradi e punti cardinali. Tieni il telefono in piano; su iPhone il browser chiederà il permesso al primo utilizzo.</p>
 
       <h3>Salvataggio ed export</h3>
       <p>Il diario si salva da solo sul dispositivo: puoi chiudere e riaprire quando vuoi. <span class="tasto">Scarica diario (.md)</span> esporta il testo; <span class="tasto">Scarica con foto (.html)</span> crea un file completo di foto e memo vocali, perfetto da archiviare o condividere. <span class="tasto">Svuota</span> cancella tutto definitivamente.</p>
@@ -395,10 +484,13 @@ const S = {
   tracking:false, watchId:null,
   path:[],            // {lat,lon,t}
   distanza:0,         // metri
+  quota:null,         // quota corrente (m)
+  dislivello:0,       // dislivello positivo cumulato (m)
+  _quotaPrec:null,    // per il calcolo del dislivello
   anchor:null,        // punto di riferimento per la sosta
   anchorT:0,
   ultimaTappaPos:null,
-  entries:[],         // {id,t,lat,lon,nome,ambiente,storia,stato}
+  entries:[],         // {id,t,lat,lon,alt,nome,ambiente,storia,stato}
   contatore:0
 };
 
@@ -423,7 +515,8 @@ function salva(){ // debounce 800ms: evita scritture a raffica durante il tracki
       const dati={
         entries:S.entries.map(e=>({...e, t:e.t.toISOString()})),
         path:S.path, distanza:S.distanza, contatore:S.contatore,
-        ultimaTappaPos:S.ultimaTappaPos
+        ultimaTappaPos:S.ultimaTappaPos,
+        dislivello:S.dislivello, quota:S.quota
       };
       db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).put(dati,'v1');
     }catch(err){ console.warn('Salvataggio non riuscito:',err); }
@@ -438,13 +531,16 @@ async function ripristina(){
     });
     if(!dati) return;
     S.entries=(dati.entries||[]).map(e=>({...e, t:new Date(e.t),
-      nota:e.nota||'', audio:e.audio||[], foto:e.foto||[], video:e.video||null,
+      nota:e.nota||'', audio:e.audio||[], foto:e.foto||[], video:e.video||null, alt:(typeof e.alt==='number')?e.alt:null,
       stato: e.stato==='caricamento' ? 'errore' : e.stato})); // richieste interrotte -> riprovabili
     S.entries.sort((a,b)=>b.t-a.t);
     S.path=dati.path||[];
     S.distanza=dati.distanza||0;
     S.contatore=dati.contatore||0;
     S.ultimaTappaPos=dati.ultimaTappaPos||null;
+    S.dislivello=dati.dislivello||0;
+    S.quota=(typeof dati.quota==='number')?dati.quota:null;
+    S._quotaPrec=S.quota;
     renderTimeline(); aggiornaStat();
     if(S.entries.length) avviso("Diario ripristinato: "+S.entries.length+" tappe recuperate.",4000);
   }catch(err){ console.warn('Ripristino non riuscito:',err); }
@@ -474,6 +570,9 @@ function avviso(msg, ms=6000){
 function aggiornaStat(){
   $('statDist').textContent=(S.distanza/1000).toFixed(1).replace('.',',')+' km';
   $('statTappe').textContent=S.entries.length;
+  $('statQuota').innerHTML = S.quota!==null
+    ? ' · Quota: <b>'+Math.round(S.quota)+' m</b>'+(S.dislivello>=5?' · D+ <b>'+Math.round(S.dislivello)+' m</b>':'')
+    : '';
 }
 
 /* ---------- tracciamento GPS ---------- */
@@ -513,6 +612,18 @@ function onPos(pos){
   const p={lat:pos.coords.latitude, lon:pos.coords.longitude, t:Date.now()};
   $('gpsStato').textContent='GPS attivo · precisione '+Math.round(pos.coords.accuracy)+' m';
 
+  // quota: solo se il fix la fornisce con precisione decente (il wifi spesso non la dà)
+  const alt=pos.coords.altitude, altAcc=pos.coords.altitudeAccuracy;
+  if(alt!==null && (altAcc===null || altAcc<=35)){
+    S.quota=alt;
+    p.alt=Math.round(alt);
+    if(S._quotaPrec!==null){
+      const delta=alt-S._quotaPrec;
+      if(delta>3) S.dislivello+=delta;      // soglia anti-rumore: salite sotto i 3 m ignorate
+      if(Math.abs(delta)>3) S._quotaPrec=alt;
+    }else{ S._quotaPrec=alt; }
+  }
+
   const ultimo=S.path[S.path.length-1];
   if(ultimo){
     const d=haversine(ultimo,p);
@@ -538,7 +649,7 @@ function checkSosta(p){
     // evita doppioni: nuova tappa solo se lontana dall'ultima registrata
     if(!S.ultimaTappaPos || haversine(S.ultimaTappaPos,S.anchor)>raggio*1.5){
       S.ultimaTappaPos={...S.anchor};
-      creaTappa(S.anchor.lat, S.anchor.lon, new Date(), 'sosta rilevata');
+      creaTappa(S.anchor.lat, S.anchor.lon, new Date(), 'sosta rilevata', S.anchor.alt ?? S.quota);
     }
     S.anchorT=p.t; // non ripetere finché non ci si sposta
   }
@@ -547,11 +658,11 @@ function checkSosta(p){
 /* ---------- creazione tappe ---------- */
 $('btnSegna').addEventListener('click',()=>{
   const ultimo=S.path[S.path.length-1];
-  if(ultimo){ creaTappa(ultimo.lat, ultimo.lon, new Date(), 'segnato a mano'); return; }
+  if(ultimo){ creaTappa(ultimo.lat, ultimo.lon, new Date(), 'segnato a mano', ultimo.alt ?? S.quota); return; }
   if('geolocation' in navigator){
     $('gpsStato').textContent='Rilevo la posizione…';
     navigator.geolocation.getCurrentPosition(
-      pos=>creaTappa(pos.coords.latitude,pos.coords.longitude,new Date(),'segnato a mano'),
+      pos=>creaTappa(pos.coords.latitude,pos.coords.longitude,new Date(),'segnato a mano',pos.coords.altitude),
       onGpsErr, {enableHighAccuracy:true, timeout:15000}
     );
   } else {
@@ -573,9 +684,10 @@ $('btnAggiungiManuale').addEventListener('click',()=>{
   creaTappa(lat,lon,new Date(),'coordinate manuali');
 });
 
-function creaTappa(lat,lon,quando,tipo){
+function creaTappa(lat,lon,quando,tipo,alt){
   const e={
     id:'t'+(++S.contatore), t:quando, lat, lon,
+    alt:(typeof alt==='number')?Math.round(alt):null, // quota in metri
     nome:null, ambiente:null, storia:null, stato:'caricamento', tipo,
     foto:[],   // dataURL JPEG ridimensionate
     nota:'',   // appunti personali
@@ -587,7 +699,18 @@ function creaTappa(lat,lon,quando,tipo){
   renderTimeline();
   aggiornaStat();
   salva();
+  if(e.alt===null) quotaDaMappa(e); // fallback: quota dal modello del terreno
   generaRacconto(e);
+}
+
+/* quota dal modello digitale del terreno quando il GPS non la fornisce */
+async function quotaDaMappa(e){
+  try{
+    const r=await fetch('https://api.open-elevation.com/api/v1/lookup?locations='+e.lat+','+e.lon);
+    const d=await r.json();
+    const q=d.results&&d.results[0]&&d.results[0].elevation;
+    if(typeof q==='number'){ e.alt=Math.round(q); renderTimeline(); salva(); }
+  }catch(_){/* servizio non raggiungibile: la tappa resta senza quota */}
 }
 
 /* ---------- narrazione con Claude + web search ---------- */
@@ -792,7 +915,8 @@ function renderTimeline(){
       '<div class="scheda">'+
         '<div class="scheda-testata">'+
           '<span class="ora mono">'+oraIT(e.t)+'</span>'+
-          '<span class="coord mono">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+'</span>'+
+          '<span class="coord mono">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+
+            (e.alt!==null&&e.alt!==undefined?' · '+e.alt+' m':'')+'</span>'+
           '<span class="badge">'+esc(e.tipo)+'</span>'+
         '</div>'+
         '<div class="scheda-corpo">'+corpo+'</div>'+
@@ -939,7 +1063,7 @@ $('btnExport').addEventListener('click',()=>{
   md+="Percorso totale: "+(S.distanza/1000).toFixed(1)+" km · Tappe: "+S.entries.length+"\n\n---\n\n";
   for(const e of cron){
     md+="## "+oraIT(e.t)+" — "+(e.nome||"Tappa")+"\n";
-    md+="*Coordinate: "+e.lat.toFixed(5)+", "+e.lon.toFixed(5)+" ("+e.tipo+")*\n\n";
+    md+="*Coordinate: "+e.lat.toFixed(5)+", "+e.lon.toFixed(5)+(e.alt!=null?" · "+e.alt+" m s.l.m.":"")+" ("+e.tipo+")*\n\n";
     if(e.nota)     md+="**Appunti.** "+e.nota+"\n\n";
     if(e.audio.length) md+="*("+e.audio.length+" memo vocali — inclusi nell'export .html)*\n\n";
     if(e.ambiente) md+="**Ambiente.** "+e.ambiente+"\n\n";
@@ -1021,6 +1145,99 @@ function ridimensiona(file){
 
 $('lightbox').addEventListener('click',()=>$('lightbox').classList.remove('show'));
 
+/* ---------- bussola (sempre visibile) ---------- */
+let _busAttiva=false, _busHandler=null, _busEvento=null;
+const CARDINALI=['Nord','Nord-Est','Est','Sud-Est','Sud','Sud-Ovest','Ovest','Nord-Ovest'];
+
+document.addEventListener('DOMContentLoaded',()=>{
+  costruisciNastro();
+  if(typeof DeviceOrientationEvent!=='undefined' &&
+     typeof DeviceOrientationEvent.requestPermission==='function'){
+    // iOS: il permesso ai sensori richiede un gesto dell'utente
+    $('nastroAttiva').hidden=false;
+  }else{
+    accendiBussola(); // Android/desktop: parte subito
+  }
+});
+
+$('nastroAttiva').addEventListener('click', async ()=>{
+  try{
+    const perm=await DeviceOrientationEvent.requestPermission();
+    if(perm!=='granted'){ $('busCard').textContent="Permesso bussola negato."; return; }
+    $('nastroAttiva').hidden=true;
+    accendiBussola();
+  }catch(err){ $('busCard').textContent="Bussola non disponibile: "+err.message; }
+});
+
+function accendiBussola(){
+  costruisciNastro();
+  let ultimaH=null;
+  _busHandler=ev=>{
+    let heading=null;
+    if(typeof ev.webkitCompassHeading==='number' && !isNaN(ev.webkitCompassHeading)){
+      heading=ev.webkitCompassHeading;                    // iOS: già gradi da Nord, orario
+    }else if(ev.absolute===true || _busEvento==='deviceorientationabsolute'){
+      if(typeof ev.alpha==='number') heading=(360-ev.alpha)%360;  // Android assoluto
+    }else if(typeof ev.alpha==='number'){
+      heading=(360-ev.alpha)%360;                         // relativo: meglio di niente
+    }
+    if(heading===null) return;
+    // compensazione rotazione schermo
+    const rot=(screen.orientation&&screen.orientation.angle)||0;
+    heading=(heading+rot+360)%360;
+
+    // il nastro scorre: la tacca della direzione corrente finisce sotto l'ago fisso al centro
+    const n=$('nastro');
+    const centro=$('nastroVp').clientWidth/2;
+    // salto 359↔0: riposiziono senza animazione per evitare lo sfrecciamento all'indietro
+    if(ultimaH!==null && Math.abs(heading-ultimaH)>180){
+      n.style.transition='none';
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ n.style.transition=''; }));
+    }
+    ultimaH=heading;
+    n.style.transform='translateX('+(centro-(heading+180)*PX_GRADO)+'px)';
+
+    $('busGradi').textContent=Math.round(heading)+'°';
+    $('busCard').textContent=CARDINALI[Math.round(heading/45)%8];
+  };
+  // preferisco l'evento assoluto quando esiste (Android)
+  _busEvento=('ondeviceorientationabsolute' in window)?'deviceorientationabsolute':'deviceorientation';
+  window.addEventListener(_busEvento,_busHandler);
+  _busAttiva=true;
+  // se dopo 3s non arriva nulla, il dispositivo non ha il sensore
+  setTimeout(()=>{
+    if(_busAttiva && $('busGradi').textContent==='—°'){
+      $('busCard').textContent="Nessun segnale dal magnetometro (serve un telefono, in HTTPS).";
+    }
+  },3000);
+}
+
+/* nastro graduato: copre -180°..+720° così ogni direzione ha margine su entrambi i lati */
+const PX_GRADO=4;
+const CARD_TAPE={0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SO',270:'O',315:'NO'};
+let _nastroCostruito=false;
+function costruisciNastro(){
+  if(_nastroCostruito) return;
+  const n=$('nastro');
+  n.style.width=(900*PX_GRADO)+'px';
+  let html='';
+  for(let d=-180; d<=720; d+=5){
+    const x=(d+180)*PX_GRADO;
+    const g=((d%360)+360)%360;
+    const cls = g%45===0 ? 't45' : g%15===0 ? 't15' : 't5';
+    html+='<div class="tick '+cls+'" style="left:'+x+'px"></div>';
+    if(g%45===0){
+      const c=CARD_TAPE[g];
+      html+='<div class="tick-lbl card'+(c==='N'?' nord':'')+'" style="left:'+x+'px">'+c+'</div>';
+    }else if(g%30===0){
+      html+='<div class="tick-lbl" style="left:'+x+'px">'+g+'</div>';
+    }
+  }
+  n.innerHTML=html;
+  _nastroCostruito=true;
+}
+
+
 /* ---------- guida ---------- */
 $('btnHelp').addEventListener('click',()=>{
   $('guida').classList.add('show');
@@ -1050,7 +1267,7 @@ $('btnExportHtml').addEventListener('click',()=>{
     ' · Percorso: '+(S.distanza/1000).toFixed(1).replace('.',',')+' km · Tappe: '+S.entries.length+'</p>';
   for(const e of cron){
     h+='<h2>'+oraIT(e.t)+' — '+esc(e.nome||'Tappa')+'</h2>'+
-       '<p class="meta">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+' ('+esc(e.tipo)+')</p>';
+       '<p class="meta">'+e.lat.toFixed(5)+', '+e.lon.toFixed(5)+(e.alt!=null?' · '+e.alt+' m s.l.m.':'')+' ('+esc(e.tipo)+')</p>';
     if(e.nota)     h+='<h4>Appunti</h4><p style="font-style:italic;border-left:3px solid #6E7F5C;padding-left:10px;white-space:pre-wrap">'+esc(e.nota)+'</p>';
     if(e.audio.length) h+='<h4>Memo vocali</h4>'+e.audio.map(a=>'<audio controls preload="metadata" src="'+a.data+'" style="display:block;width:100%;margin:4px 0"></audio>').join('');
     if(e.foto.length) h+='<div class="foto">'+e.foto.map(f=>'<img src="'+f+'" alt="Foto">').join('')+'</div>';
@@ -1069,7 +1286,7 @@ $('btnExportHtml').addEventListener('click',()=>{
 
 $('btnReset').addEventListener('click',()=>{
   if(!confirm("Svuotare il diario e il percorso? I dati salvati verranno eliminati definitivamente.")) return;
-  S.path=[];S.distanza=0;S.entries=[];S.anchor=null;S.ultimaTappaPos=null;
+  S.path=[];S.distanza=0;S.entries=[];S.anchor=null;S.ultimaTappaPos=null;S.dislivello=0;S.quota=null;S._quotaPrec=null;
   cancellaDB();
   renderTimeline();aggiornaStat();
 });
